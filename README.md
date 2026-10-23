@@ -8,6 +8,20 @@ A Windows desktop player for HLS, DASH and IPTV playlists, with custom request h
 
 > **Credits.** This is a rebuild of [**sirat-o/stream_player**](https://github.com/sirat-o/stream_player) by Sirat, which is itself a modified version of [**MirazMac/Media-Stream-Player**](https://github.com/MirazMac/Media-Stream-Player). The stream, header, DRM and M3U handling build on their work. This version adds a new interface, a rewritten player and the fixes listed below. Released under the original MIT license; see [LICENSE](LICENSE).
 
+## Screenshots
+
+![Workspace: paste a stream URL, add headers and DRM keys, then play](docs/screenshots/workspace.png)
+
+| Player | Multiple audio tracks |
+| --- | --- |
+| ![Player with custom controls](docs/screenshots/player.jpg) | ![Audio track menu listing every language and codec](docs/screenshots/audio-tracks.png) |
+| **Playlist channels** | **Library** |
+| ![Channel browser with search and group filters](docs/screenshots/channels.png) | ![Saved profiles and playback history](docs/screenshots/library.png) |
+| **Settings** | **Light theme** |
+| ![Settings with theme and playback options](docs/screenshots/settings.png) | ![Workspace in the light theme](docs/screenshots/workspace-light.png) |
+
+<sub>Shown with public test streams from Mux and the Shaka Player demo assets.</sub>
+
 ## Download
 
 Get `stream-player.exe` from the [latest release](../../releases/latest). It's a single standalone file, so there's nothing to install: put it anywhere and run it.
