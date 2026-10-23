@@ -1,0 +1,16 @@
+<script>
+  /** The app mark: a play arrow cut into segments. Same drawing as app-icon.svg. */
+  /** @type {{ size?: number, class?: string }} */
+  let { size = 22, class: className = "" } = $props();
+</script>
+
+<svg class={className} width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+  <rect x="4.75" y="4.75" width="54.5" height="54.5" rx="13" fill="#0b0b0c" stroke="#33363c" stroke-width="1.5" />
+  <path d="M19.5 14.5 46 32 19.5 49.5Z" fill="#ffd23f" stroke="#ffd23f" stroke-width="5" stroke-linejoin="round" />
+  <g fill="#0b0b0c">
+    <rect x="14" y="18.1" width="38" height="2.4" />
+    <rect x="14" y="26.6" width="38" height="2.4" />
+    <rect x="14" y="35.1" width="38" height="2.4" />
+    <rect x="14" y="43.6" width="38" height="2.4" />
+  </g>
+</svg>

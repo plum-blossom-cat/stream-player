@@ -1,0 +1,609 @@
+/* ------------------------------------------------------------------
+   Tokens
+   "Instrument panel" on AMOLED black: true #000 ground, near-black
+   panels, one sodium-yellow action colour, red reserved for live.
+------------------------------------------------------------------- */
+:root {
+  color-scheme: dark;
+  --bg: #000000;
+  --surface: #0b0b0c;
+  --raised: #151619;
+  --raised-hover: #1d1f23;
+  --sunken: #050506;
+  --line: #1f2125;
+  --line-strong: #33363c;
+  --line-hover: #464a52;
+  --ink: #ececee;
+  --muted: #9a9fa8;
+  --faint: #6b7079;
+  --accent: #ffd23f;
+  --accent-hover: #ffdd6b;
+  --accent-press: #e6bb2f;
+  --accent-text: #ffd23f;
+  --accent-ink: #1d1700;
+  --accent-soft: rgb(255 210 63 / 0.15);
+  --red: #ef4b4b;
+  --red-text: #ff7b7b;
+  --red-soft: rgb(239 75 75 / 0.15);
+  --scrim: rgb(0 0 0 / 0.75);
+  --shadow-pop: 0 18px 48px rgb(0 0 0 / 0.7), 0 0 0 1px #1f2125;
+
+  --font: "Archivo Variable", "Archivo", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --titlebar-h: 44px;
+  --r-xs: 3px;
+  --r-sm: 5px;
+  --r-md: 6px;
+  --r-lg: 8px;
+  --gutter: clamp(16px, 3.2vw, 40px);
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f2f3f5;
+  --surface: #ffffff;
+  --raised: #ffffff;
+  --raised-hover: #f3f4f6;
+  --sunken: #ebedf0;
+  --line: #d9dce1;
+  --line-strong: #b9bec6;
+  --line-hover: #9aa0aa;
+  --ink: #15171b;
+  --muted: #555b64;
+  --faint: #7a808a;
+  --accent: #ffd23f;
+  --accent-hover: #ffdd6b;
+  --accent-press: #f0c22a;
+  --accent-text: #7d5f00;
+  --accent-ink: #1d1700;
+  --accent-soft: rgb(255 210 63 / 0.28);
+  --red: #d13438;
+  --red-text: #b4262a;
+  --red-soft: rgb(209 52 56 / 0.1);
+  --scrim: rgb(21 23 27 / 0.4);
+  --shadow-pop: 0 18px 48px rgb(21 23 27 / 0.16), 0 0 0 1px #d9dce1;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    color-scheme: light;
+    --bg: #f2f3f5;
+    --surface: #ffffff;
+    --raised: #ffffff;
+    --raised-hover: #f3f4f6;
+    --sunken: #ebedf0;
+    --line: #d9dce1;
+    --line-strong: #b9bec6;
+    --line-hover: #9aa0aa;
+    --ink: #15171b;
+    --muted: #555b64;
+    --faint: #7a808a;
+    --accent: #ffd23f;
+    --accent-hover: #ffdd6b;
+    --accent-press: #f0c22a;
+    --accent-text: #7d5f00;
+    --accent-ink: #1d1700;
+    --accent-soft: rgb(255 210 63 / 0.28);
+    --red: #d13438;
+    --red-text: #b4262a;
+    --red-soft: rgb(209 52 56 / 0.1);
+    --scrim: rgb(21 23 27 / 0.4);
+    --shadow-pop: 0 18px 48px rgb(21 23 27 / 0.16), 0 0 0 1px #d9dce1;
+  }
+}
+
+/* ------------------------------------------------------------------
+   Base
+------------------------------------------------------------------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font);
+  font-size: 14px;
+  line-height: 1.5;
+  font-variation-settings: "wdth" 100;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.visually-hidden {
+  position: absolute !important;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------------
+   Type
+------------------------------------------------------------------- */
+.display {
+  font-size: clamp(26px, 3.4vw, 36px);
+  line-height: 1.1;
+  font-weight: 680;
+  font-stretch: 125%;
+  font-variation-settings: "wdth" 125;
+  letter-spacing: -0.012em;
+}
+
+.lede {
+  color: var(--muted);
+  font-size: 15px;
+  max-width: 62ch;
+  margin-top: 8px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 620;
+  letter-spacing: 0.002em;
+}
+
+.section-note {
+  color: var(--muted);
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+.num {
+  font-variant-numeric: tabular-nums;
+  font-variation-settings: "wdth" 88;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* ------------------------------------------------------------------
+   Page frame
+------------------------------------------------------------------- */
+.page {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding: clamp(24px, 4vw, 44px) var(--gutter) 72px;
+}
+
+.page-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px 24px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
+}
+
+/* ------------------------------------------------------------------
+   Controls
+   6px corners, 1px borders, no glow. The yellow accent appears only on
+   the one action that moves you forward.
+------------------------------------------------------------------- */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line-strong);
+  background: var(--raised);
+  color: var(--ink);
+  font-size: 13.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: none;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 0.05);
+  transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+}
+
+.btn:hover {
+  background: var(--raised-hover);
+  border-color: var(--line-hover);
+}
+
+.btn:active {
+  transform: translateY(1px);
+  background: var(--sunken);
+  box-shadow: none;
+}
+
+.btn:disabled {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--faint);
+  box-shadow: none;
+  pointer-events: none;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+  box-shadow: none;
+}
+
+.btn.primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.btn.primary:active {
+  background: var(--accent-press);
+  border-color: var(--accent-press);
+}
+
+.btn.primary:focus-visible {
+  outline-color: var(--ink);
+}
+
+.btn.primary:disabled {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--faint);
+}
+
+.btn.quiet {
+  background: transparent;
+  border-color: transparent;
+  color: var(--muted);
+  font-weight: 540;
+  box-shadow: none;
+  padding: 0 12px;
+}
+
+.btn.quiet:hover {
+  background: var(--raised);
+  color: var(--ink);
+}
+
+.btn.quiet:active {
+  background: var(--sunken);
+}
+
+.btn.danger:hover {
+  color: var(--red-text);
+  border-color: var(--red);
+}
+
+.btn.danger:active {
+  background: var(--red-soft);
+}
+
+.btn.quiet.danger:hover {
+  background: var(--red-soft);
+  border-color: transparent;
+}
+
+.btn.icon {
+  width: 36px;
+  padding: 0;
+}
+
+.btn.sm {
+  height: 28px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  border-radius: var(--r-sm);
+}
+
+.btn.sm.quiet {
+  padding: 0 10px;
+}
+
+.btn.sm.icon {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+}
+
+/* Bordered square icon button that lights up yellow, e.g. row "play" actions. */
+.btn.go {
+  background: transparent;
+  border-color: var(--line);
+  color: var(--muted);
+  box-shadow: none;
+}
+
+.btn.go:hover {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: transparent;
+}
+
+.btn.go:active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Keyboard shortcut shown inside a button. */
+.kbd-hint {
+  padding: 1px 6px;
+  border-radius: var(--r-xs);
+  background: rgb(0 0 0 / 0.1);
+  color: inherit;
+  opacity: 0.7;
+  font-size: 11.5px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 88;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.field > label,
+.field-label {
+  font-size: 12.5px;
+  font-weight: 540;
+  color: var(--muted);
+}
+
+.input {
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--line);
+  background: var(--sunken);
+  color: var(--ink);
+  font-size: 14px;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+textarea.input {
+  height: auto;
+  min-height: 84px;
+  padding: 9px 12px;
+  resize: vertical;
+  line-height: 1.5;
+  font-variation-settings: "wdth" 88;
+}
+
+select.input {
+  appearance: none;
+  padding-right: 34px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='15' height='15' viewBox='0 0 24 24' fill='none' stroke='%239a9fa8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 15 5 5 5-5M7 9l5-5 5 5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+}
+
+select.input option {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.input::placeholder {
+  color: var(--faint);
+}
+
+.input:hover {
+  border-color: var(--line-strong);
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.input.invalid {
+  border-color: var(--red);
+}
+
+.error-text {
+  color: var(--red-text);
+  font-size: 13px;
+}
+
+.hint {
+  color: var(--faint);
+  font-size: 12.5px;
+}
+
+.segmented {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: var(--r-md);
+  background: var(--surface);
+  border: 1px solid var(--line);
+}
+
+.segmented button {
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12.5px;
+  font-weight: 540;
+}
+
+.segmented button:hover {
+  color: var(--ink);
+}
+
+.segmented button[aria-pressed="true"] {
+  background: var(--raised);
+  color: var(--ink);
+  font-weight: 600;
+  box-shadow: 0 0 0 1px var(--line-strong);
+}
+
+/* Small bar beside a section title. Yellow when the section has values set. */
+.mark {
+  display: inline-block;
+  width: 3px;
+  height: 14px;
+  margin-right: 8px;
+  border-radius: 2px;
+  background: var(--line-strong);
+  vertical-align: -1px;
+  transition: background-color 160ms ease;
+}
+
+.mark.on {
+  background: var(--accent);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: var(--r-xs);
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  font-variation-settings: "wdth" 88;
+  white-space: nowrap;
+}
+
+.tag.drm {
+  color: var(--accent-text);
+  border-color: transparent;
+  background: var(--accent-soft);
+}
+
+.empty {
+  padding: 36px 24px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  color: var(--muted);
+  text-align: center;
+}
+
+.empty strong {
+  display: block;
+  color: var(--ink);
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+/* Row list used by library and playlists */
+.rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--line);
+}
+
+.row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 11px 8px 11px 12px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  transition: background-color 120ms ease;
+}
+
+.row:hover {
+  background: var(--surface);
+}
+
+.row-title {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12.5px;
+  min-width: 0;
+}
+
+.row-meta .url {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-variation-settings: "wdth" 88;
+}
+
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}

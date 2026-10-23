@@ -1,0 +1,33 @@
+{
+  "name": "stream-player",
+  "version": "2.0.0",
+  "description": "Desktop player for HLS, DASH and IPTV playlists with custom headers and DRM",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "preview": "vite preview",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./jsconfig.json",
+    "tauri": "tauri"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@fontsource-variable/archivo": "^5.2.5",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-http": "^2.5.2",
+    "@tauri-apps/plugin-opener": "^2",
+    "json5": "^2.2.3",
+    "parse-curl": "^0.2.6",
+    "shaka-player": "^4.16.3"
+  },
+  "devDependencies": {
+    "@sveltejs/adapter-static": "^3.0.6",
+    "@sveltejs/kit": "^2.9.0",
+    "@sveltejs/vite-plugin-svelte": "^5.0.0",
+    "@tauri-apps/cli": "^2",
+    "svelte": "^5.0.0",
+    "svelte-check": "^4.0.0",
+    "typescript": "~5.6.2",
+    "vite": "^6.0.3"
+  }
+}
