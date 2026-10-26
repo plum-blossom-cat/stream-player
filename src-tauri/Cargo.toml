@@ -1,6 +1,6 @@
 [package]
 name = "stream-player"
-version = "2.0.0"
+version = "2.0.1"
 description = "A Tauri App for online stream"
 authors = ["you"]
 edition = "2021"

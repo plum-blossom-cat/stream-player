@@ -1,6 +1,6 @@
 {
   "name": "stream-player",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "Desktop player for HLS, DASH and IPTV playlists with custom headers and DRM",
   "type": "module",
   "scripts": {
