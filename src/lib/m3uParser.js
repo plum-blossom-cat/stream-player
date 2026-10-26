@@ -105,11 +105,35 @@ const parseCommaValue = (line = "") => {
 };
 
 const parsePipeHeaders = (urlLine, state) => {
-  const [rawUrl, rawHeaderText] = urlLine.split("|");
-  if (!rawHeaderText) return rawUrl.trim();
+  // The separator may also arrive percent-encoded ("?%7CdrmScheme=…").
+  const match = /\||%7c/i.exec(urlLine);
+  if (!match) return urlLine.trim();
+  const rawUrl = urlLine.slice(0, match.index).replace(/[?&]+$/, "");
+  const rawHeaderText = urlLine.slice(match.index + match[0].length);
+  if (!rawHeaderText.trim()) return rawUrl.trim();
 
   const params = new URLSearchParams(rawHeaderText.trim());
-  params.forEach((value, key) => appendHeader(state, decodeSafe(key), decodeSafe(value)));
+  params.forEach((value, key) => {
+    const name = decodeSafe(key).trim().toLowerCase();
+    const val = decodeSafe(value).trim();
+    // NS Player style DRM options, not HTTP headers.
+    if (name === "drmscheme") {
+      if (val.toLowerCase().includes("widevine")) state.stream.drmScheme = "com.widevine.alpha";
+      else if (val.toLowerCase().includes("playready")) state.stream.drmScheme = "com.microsoft.playready";
+      return;
+    }
+    if (name === "drmlicense") {
+      if (isUrl(val)) {
+        state.stream.licenseUrl = val;
+        if (state.stream.drmScheme === "none") state.stream.drmScheme = "org.w3.clearkey";
+      } else if (val.includes(":")) {
+        state.stream.drmScheme = "clearkey_inline";
+        state.stream.clearKey = val;
+      }
+      return;
+    }
+    appendHeader(state, decodeSafe(key), decodeSafe(value));
+  });
   return rawUrl.trim();
 };
 
