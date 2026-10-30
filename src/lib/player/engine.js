@@ -101,6 +101,7 @@ export async function loadStream(player, stream, options = {}) {
       bufferBehind: 30,
       segmentPrefetchLimit: 2,
       lowLatencyMode: false,
+      observeQualityChanges: true,
       retryParameters: { maxAttempts: 4, baseDelay: 500, timeout: 20000 },
     },
   });

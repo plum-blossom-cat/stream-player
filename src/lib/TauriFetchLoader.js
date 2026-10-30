@@ -1,4 +1,3 @@
-import { dev_log } from "$lib";
 // @ts-ignore
 import shaka from "shaka-player/dist/shaka-player.compiled.js";
 
@@ -45,16 +44,13 @@ export class TauriFetchLoader {
       canceled: false,
       timedOut: false,
     };
-    const minBytes = config.minBytesForProgressEvents || 0;
     const pendingRequest = TauriFetchLoader.request_(
       uri,
       requestType,
       init,
       abortStatus,
-      progressUpdated,
       headersReceived,
-      request.streamDataCallback,
-      minBytes
+      request.streamDataCallback
     );
     /** @type {!shaka.util.AbortableOperation} */
     const op = new shaka.util.AbortableOperation(pendingRequest, () => {
@@ -84,10 +80,8 @@ export class TauriFetchLoader {
    * @param {shaka.net.NetworkingEngine.RequestType} requestType
    * @param {!RequestInit} init
    * @param {TauriFetchLoader.AbortStatus} abortStatus
-   * @param {shaka.extern.ProgressUpdated} progressUpdated
    * @param {shaka.extern.HeadersReceived} headersReceived
    * @param {?function(BufferSource):!Promise} streamDataCallback
-   * @param {number} minBytes
    * @return {!Promise<!shaka.extern.Response>}
    * @private
    */
@@ -96,10 +90,8 @@ export class TauriFetchLoader {
     requestType,
     init,
     abortStatus,
-    progressUpdated,
     headersReceived,
-    streamDataCallback,
-    minBytes
+    streamDataCallback
   ) {
     const { fetch } = await import("@tauri-apps/plugin-http");
 
@@ -109,13 +101,8 @@ export class TauriFetchLoader {
       acceptInvalidHostnames: true,
     };
 
-    const ReadableStream = window.ReadableStream;
     let response;
     let arrayBuffer;
-    let loaded = 0;
-    let lastLoaded = 0;
-    // Last time stamp when we got a progress event.
-    let lastTime = Date.now();
     try {
       // The promise returned by fetch resolves as soon as the HTTP response
       // headers are available. The download itself isn't done until the promise
@@ -132,70 +119,30 @@ export class TauriFetchLoader {
       // to avoid null reference errors.
       // See: https://crbug.com/1297060
       if (init.method != "HEAD") {
-        // Getting the reader in this way allows us to observe the process of
-        // downloading the body, instead of just waiting for an opaque promise
-        // to resolve.
-        // We first clone the response because calling getReader locks the body
-        // stream; if we didn't clone it here, we would be unable to get the
-        // response's arrayBuffer later.
-        const reader = response.clone().body.getReader();
-        const contentLengthRaw = response.headers.get("Content-Length");
-        const contentLength = contentLengthRaw
-          ? parseInt(contentLengthRaw, 10)
-          : 0;
-        const start = (controller) => {
-          const push = async () => {
-            let readObj;
-            try {
-              readObj = await reader.read();
-            } catch (e) {
-              // If we abort the request, we'll get an error here.  Just ignore
-              // it since real errors will be reported when we read the buffer
-              // below.
-              dev_log(e);
-              return;
-            }
-            if (!readObj.done) {
-              loaded += readObj.value.byteLength;
-              if (streamDataCallback) {
-                await streamDataCallback(readObj.value);
-              }
-            }
-            const currentTime = Date.now();
-            const chunkSize = loaded - lastLoaded;
-            // If the time between last time and this time we got progress event
-            // is long enough, or if a whole segment is downloaded, call
-            // progressUpdated().
-            if (
-              (currentTime - lastTime > 100 && chunkSize >= minBytes) ||
-              readObj.done
-            ) {
-              const numBytesRemaining = readObj.done
-                ? 0
-                : contentLength - loaded;
-              progressUpdated(
-                currentTime - lastTime,
-                chunkSize,
-                numBytesRemaining
-              );
-              lastLoaded = loaded;
-              lastTime = currentTime;
-            }
-            if (readObj.done) {
-              controller.close();
-            } else {
-              controller.enqueue(readObj.value);
-              push();
-            }
-          };
-          push();
-        };
-        // Create a ReadableStream to use the reader. We don't need to use the
-        // actual stream for anything, though, as we are using the response's
-        // arrayBuffer method to get the body, so we don't store the
-        // ReadableStream.
-        new ReadableStream({ start }); // eslint-disable-line no-new
-        arrayBuffer = await response.arrayBuffer();
+        // Read the body once. Don't call progressUpdated: Shaka would then use
+        // those partial samples for its bandwidth estimate instead of timing the
+        // whole segment. They measure the Rust-to-JS bridge rather than the
+        // network, and kept the estimate far too low, so adaptive quality never
+        // climbed to the higher resolutions and frame rates.
+        const chunks = [];
+        let total = 0;
+        const reader = response.body ? response.body.getReader() : null;
+        while (reader) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+          total += value.byteLength;
+          if (streamDataCallback) {
+            await streamDataCallback(value);
+          }
+        }
+        const body = new Uint8Array(total);
+        let offset = 0;
+        for (const chunk of chunks) {
+          body.set(chunk, offset);
+          offset += chunk.byteLength;
+        }
+        arrayBuffer = body.buffer;
       }
     } catch (error) {
       if (abortStatus.canceled) {

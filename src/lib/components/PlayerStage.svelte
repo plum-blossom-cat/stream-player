@@ -53,6 +53,19 @@
   let qualities = $state([]);
   let abrOn = $state(true);
   let activeHeight = $state(0);
+  let activeWidth = $state(0);
+  let activeBandwidth = $state(0);
+  let activeDeclaredFps = $state(0);
+  let activeKey = $state("");
+  /** Frames actually rendered per second, measured from the video element. */
+  let measuredFps = $state(0);
+  let fpsSample = null;
+  /**
+   * The rendition actually on screen. The active track is what's being downloaded,
+   * which runs ahead of playback by the length of the buffer.
+   * @type {{ width: number, height: number, fps: number, bandwidth: number } | null}
+   */
+  let onScreen = $state(null);
   /** @type {import("$lib/player/audio.js").AudioItem[]} */
   let audioItems = $state([]);
   const activeAudio = $derived(audioItems.find((item) => item.active) || null);
@@ -78,7 +91,14 @@
   const bufferPct = $derived(Math.min(100, Math.max(0, ((bufferedEnd - rangeStart) / span) * 100)));
   const heading = $derived(player.title || (player.stream ? hostOf(player.stream.streamUrl) : ""));
   const hasQueue = $derived(player.queue.length > 1);
-  const qualityLabel = $derived(abrOn ? (activeHeight ? `Auto, ${activeHeight}p` : "Auto") : `${activeHeight}p`);
+  // Streams don't have to declare a frame rate, so fall back to the measured one.
+  const shownWidth = $derived(onScreen?.width || activeWidth);
+  const shownHeight = $derived(onScreen?.height || activeHeight);
+  const shownBandwidth = $derived(onScreen?.bandwidth || activeBandwidth);
+  const declaredFps = $derived(onScreen?.fps || activeDeclaredFps);
+  const activeFps = $derived(declaredFps || measuredFps);
+  const activeLabel = $derived(shownHeight ? `${shownHeight}p${activeFps ? fmtFps(activeFps) : ""}` : "");
+  const qualityLabel = $derived(abrOn ? (activeLabel ? `Auto, ${activeLabel}` : "Auto") : activeLabel);
 
   function fmt(seconds) {
     if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
@@ -87,6 +107,14 @@
     const h = Math.floor(seconds / 3600);
     const pad = (n) => String(n).padStart(2, "0");
     return h ? `${h}:${pad(m)}:${pad(s)}` : `${m}:${pad(s)}`;
+  }
+
+  function fmtFps(fps) {
+    return String(Math.round(fps * 100) / 100);
+  }
+
+  function renditionKey(track) {
+    return String(track.videoId ?? `${track.height}|${track.frameRate || 0}|${track.bandwidth}`);
   }
 
   function fmtRate(bps) {
@@ -104,6 +132,13 @@
     audioItems = [];
     textTracks = [];
     activeHeight = 0;
+    activeWidth = 0;
+    activeBandwidth = 0;
+    activeDeclaredFps = 0;
+    activeKey = "";
+    measuredFps = 0;
+    fpsSample = null;
+    onScreen = null;
     abrOn = true;
     rate = 1;
     try {
@@ -159,26 +194,52 @@
     const active = variants.find((t) => t.active);
     abrOn = !!shakaPlayer.getConfiguration().abr.enabled;
     activeHeight = active?.height || 0;
+    activeWidth = active?.width || 0;
+    activeBandwidth = active?.bandwidth || 0;
+    activeDeclaredFps = Number(active?.frameRate) || 0;
+    activeKey = active ? renditionKey(active) : "";
 
     const sameAudio = variants.filter(
       (t) => !active || (t.language === active.language && t.audioId === active.audioId)
     );
     const pool = sameAudio.length ? sameAudio : variants;
-    const byHeight = new Map();
+    // One entry per rendition: 720p25 and 720p50, or two bitrates of 720p, are separate choices.
+    const renditions = new Map();
     for (const track of pool) {
       if (!track.height) continue;
-      const existing = byHeight.get(track.height);
-      if (!existing || track.bandwidth > existing.bandwidth) byHeight.set(track.height, track);
+      renditions.set(renditionKey(track), track);
     }
-    qualities = [...byHeight.values()]
-      .sort((a, b) => b.height - a.height)
-      .map((track) => ({ height: track.height, bandwidth: track.bandwidth, track }));
+    qualities = [...renditions.entries()]
+      .map(([key, track]) => ({
+        key,
+        height: track.height,
+        fps: Number(track.frameRate) || 0,
+        bandwidth: track.bandwidth,
+        track,
+      }))
+      .sort((a, b) => b.height - a.height || b.fps - a.fps || b.bandwidth - a.bandwidth);
 
     audioItems = describeAudioTracks(shakaPlayer.getAudioTracks());
 
     textTracks = shakaPlayer.getTextTracks();
     activeText = textTracks.find((t) => t.active) || null;
     textVisible = shakaPlayer.isTextTrackVisible();
+  }
+
+  function onMediaQualityChanged(event) {
+    const quality = event.mediaQuality;
+    if (quality?.contentType !== "video") return;
+    // The event carries the video bitrate alone; show the same total as the quality menu.
+    const variant = shakaPlayer
+      .getVariantTracks()
+      .find((t) => t.videoBandwidth === quality.bandwidth && t.height === quality.height && t.active)
+      ?? shakaPlayer.getVariantTracks().find((t) => t.videoBandwidth === quality.bandwidth && t.height === quality.height);
+    onScreen = {
+      width: quality.width || 0,
+      height: quality.height || 0,
+      fps: Number(quality.frameRate) || 0,
+      bandwidth: variant?.bandwidth || quality.bandwidth || 0,
+    };
   }
 
   function selectQuality(option) {
@@ -254,6 +315,7 @@
       }
     }
     bufferedEnd = end;
+    sampleFps();
 
     if (showStats) {
       const s = shakaPlayer.getStats();
@@ -268,6 +330,25 @@
         latency: isLive && Number.isFinite(s.liveLatency) ? `${s.liveLatency.toFixed(1)} s` : null,
       };
     }
+  }
+
+  function sampleFps() {
+    const quality = video.getVideoPlaybackQuality?.();
+    if (!quality) return;
+    const now = performance.now();
+    const rendered = quality.totalVideoFrames - quality.droppedVideoFrames;
+    if (video.paused || video.seeking || video.readyState < 3) {
+      fpsSample = null;
+      return;
+    }
+    if (!fpsSample) {
+      fpsSample = { now, rendered };
+      return;
+    }
+    if (now - fpsSample.now < 2000) return;
+    const fps = ((rendered - fpsSample.rendered) * 1000) / (now - fpsSample.now) / video.playbackRate;
+    if (fps > 0) measuredFps = fps;
+    fpsSample = { now, rendered };
   }
 
   function togglePlay() {
@@ -520,6 +601,7 @@
         console.warn("Recoverable playback error", err);
       }
     });
+    shakaPlayer.addEventListener("mediaqualitychanged", onMediaQualityChanged);
     shakaPlayer.addEventListener("buffering", (event) => {
       if (!firstLoad) loading = event.buffering;
     });
@@ -629,7 +711,9 @@
       <h2 class="title">{heading}</h2>
       <div class="meta">
         {#if player.stream}<span class="chip">{formatLabel(player.stream)}</span>{/if}
-        {#if activeHeight}<span class="chip">{activeHeight}p</span>{/if}
+        {#if shownHeight}<span class="chip num" title="Current resolution">{shownWidth ? `${shownWidth}×${shownHeight}` : `${shownHeight}p`}</span>{/if}
+        {#if activeFps}<span class="chip num" title="Current frame rate">{fmtFps(Math.round(activeFps * 100) / 100)} fps</span>{/if}
+        {#if shownBandwidth}<span class="chip num" title="Current stream bitrate">{fmtRate(shownBandwidth)}</span>{/if}
         {#if player.stream && player.stream.drmScheme !== "none"}<span class="chip">DRM</span>{/if}
         {#if hasAudioChoice && activeAudio}<span class="sub">Audio: {activeAudio.name}</span>{/if}
         {#if player.subtitle}<span class="sub">{player.subtitle}</span>{/if}
@@ -644,6 +728,7 @@
   {#if showStats}
     <dl class="stats num chrome" transition:fade={{ duration: 120 }}>
       <dt>Resolution</dt><dd>{stats.resolution ?? "–"}</dd>
+      <dt>Frame rate</dt><dd>{declaredFps ? `${fmtFps(declaredFps)} declared` : "Not declared"}{measuredFps ? `, ${measuredFps.toFixed(1)} rendered` : ""}</dd>
       <dt>Stream bitrate</dt><dd>{stats.bitrate ?? "–"}</dd>
       <dt>Bandwidth estimate</dt><dd>{stats.estimate ?? "–"}</dd>
       <dt>Buffer ahead</dt><dd>{stats.buffer ?? "–"}</dd>
@@ -800,9 +885,9 @@
                 <button role="menuitemradio" aria-checked={abrOn} onclick={() => selectQuality("auto")}>
                   <Icon name="check" size={16} class="tick" /><span>Auto</span><span class="val">Adapts to your connection</span>
                 </button>
-                {#each qualities as q (q.height)}
-                  <button role="menuitemradio" aria-checked={!abrOn && activeHeight === q.height} onclick={() => selectQuality(q)}>
-                    <Icon name="check" size={16} class="tick" /><span class="num">{q.height}p</span><span class="val num">{fmtRate(q.bandwidth)}</span>
+                {#each qualities as q (q.key)}
+                  <button role="menuitemradio" aria-checked={!abrOn && activeKey === q.key} onclick={() => selectQuality(q)}>
+                    <Icon name="check" size={16} class="tick" /><span class="num">{q.height}p</span>{#if q.fps}<span class="fps num">{fmtFps(q.fps)} fps</span>{/if}<span class="val num">{fmtRate(q.bandwidth)}</span>
                   </button>
                 {/each}
               {:else if menu === "audio"}
@@ -1266,6 +1351,11 @@
 
   .menu button:hover {
     background: var(--c-hover);
+  }
+
+  .menu .fps {
+    color: var(--c-dim);
+    font-size: 12.5px;
   }
 
   .menu .val {
