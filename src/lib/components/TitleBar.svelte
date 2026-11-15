@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { page } from "$app/state";
-  import { isTauri } from "$lib";
+  import { isTauri, isMac } from "$lib";
   import Icon from "$lib/components/Icon.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import { player, closePlayer } from "$lib/player/player.svelte.js";
@@ -33,7 +33,7 @@
   onDestroy(() => unlisten?.());
 </script>
 
-<header class="titlebar" data-tauri-drag-region>
+<header class="titlebar" class:mac={isTauri && isMac} data-tauri-drag-region>
   <a class="brand" href="/" onclick={() => player.open && closePlayer()} aria-label="Stream Player, workspace">
     <Logo size={22} />
     <span class="brand-name">Stream Player</span>
@@ -59,7 +59,7 @@
     <span class="on-air" data-tauri-drag-region><i aria-hidden="true"></i>Playing</span>
   {/if}
 
-  {#if isTauri}
+  {#if isTauri && !isMac}
     <div class="window-controls">
       <button onclick={() => appWindow?.minimize()} aria-label="Minimize" title="Minimize">
         <Icon name="win-min" size={16} />
@@ -172,6 +172,11 @@
     height: 7px;
     border-radius: 50%;
     background: var(--accent);
+  }
+
+  /* Leave room for the native traffic-light buttons on macOS. */
+  .titlebar.mac .brand {
+    padding-left: 84px;
   }
 
   .window-controls {

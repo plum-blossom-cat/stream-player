@@ -1,6 +1,9 @@
 export const isTauri =
   typeof window !== "undefined" && !!window["__TAURI_INTERNALS__"];
 
+/** macOS draws its own traffic-light window buttons (see tauri.macos.conf.json). */
+export const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
+
 /**
  * Parse "Name: value" lines into an object with lowercase keys.
  * @param {string} input

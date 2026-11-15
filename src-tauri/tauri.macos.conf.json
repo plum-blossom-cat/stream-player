@@ -1,0 +1,29 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Stream Player",
+  "app": {
+    "windows": [
+      {
+        "title": "Stream Player",
+        "decorations": true,
+        "titleBarStyle": "Overlay",
+        "hiddenTitle": true,
+        "trafficLightPosition": { "x": 16, "y": 22 },
+        "transparent": false,
+        "resizable": true,
+        "center": true,
+        "visible": false,
+        "width": 1180,
+        "height": 760,
+        "minWidth": 720,
+        "minHeight": 480
+      }
+    ]
+  },
+  "bundle": {
+    "macOS": {
+      "minimumSystemVersion": "11.0",
+      "signingIdentity": "-"
+    }
+  }
+}

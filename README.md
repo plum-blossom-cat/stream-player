@@ -4,7 +4,7 @@
 
 # Stream Player
 
-A Windows desktop player for HLS, DASH and IPTV playlists, with custom request headers and ClearKey / Widevine / PlayReady configuration. Built with Tauri 2, SvelteKit (Svelte 5) and Shaka Player.
+A desktop player for Windows and macOS for HLS, DASH and IPTV playlists, with custom request headers and ClearKey / Widevine / PlayReady configuration. Built with Tauri 2, SvelteKit (Svelte 5) and Shaka Player.
 
 > **Credits.** This is a rebuild of [**sirat-o/stream_player**](https://github.com/sirat-o/stream_player) by Sirat, which is itself a modified version of [**MirazMac/Media-Stream-Player**](https://github.com/MirazMac/Media-Stream-Player). The stream, header, DRM and M3U handling build on their work. This version adds a new interface, a rewritten player and the fixes listed below. Released under the original MIT license; see [LICENSE](LICENSE).
 
@@ -24,11 +24,32 @@ A Windows desktop player for HLS, DASH and IPTV playlists, with custom request h
 
 ## Download
 
-Get `stream-player.exe` from the [latest release](../../releases/latest). It's a single standalone file, so there's nothing to install: put it anywhere and run it.
+Both downloads are on the [latest release](../../releases/latest) page.
+
+### Windows
+
+Get `stream-player.exe`. It's a single standalone file, so there's nothing to install: put it anywhere and run it.
 
 - Needs the Microsoft **WebView2 Runtime**. It's built into Windows 11 and most up-to-date Windows 10 PCs. If the app doesn't open, install the [Evergreen WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/).
 - The exe isn't code-signed, so Windows SmartScreen may warn on first run. Choose **More info → Run anyway**, or build it yourself (below).
 - Your profiles, history, playlists and settings are stored in `%LOCALAPPDATA%\com.mas.player`, not in the exe, so replacing the exe keeps them.
+
+### macOS
+
+Get `stream-player-<version>-macos-universal.dmg`. It runs natively on Apple Silicon and Intel Macs with macOS 11 Big Sur or newer. Open the disk image and drag **Stream Player** into Applications.
+
+The app isn't notarized by Apple, so the first launch is blocked:
+
+1. Open Stream Player once. macOS says it can't verify the developer; click **Done**.
+2. Open **System Settings → Privacy & Security**, scroll down, and click **Open Anyway** next to Stream Player.
+
+If macOS instead says the app "is damaged and can't be opened", that's the same quarantine check. Run this in Terminal, then open the app normally:
+
+```sh
+xattr -dr com.apple.quarantine "/Applications/Stream Player.app"
+```
+
+Encrypted streams: macOS's built-in browser engine (WebKit) has more limited DRM support than Windows. Plain HLS and DASH play normally; ClearKey and Widevine streams may not.
 
 ## Build it yourself
 
@@ -39,7 +60,8 @@ Get `stream-player.exe` from the [latest release](../../releases/latest). It's a
 | **Node.js 20 or newer** (LTS) | Builds the interface | <https://nodejs.org> |
 | **Rust** (stable, via rustup) | Builds the desktop app | <https://rustup.rs> |
 | **Microsoft C++ Build Tools** | Rust needs the MSVC linker on Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), choose the **Desktop development with C++** workload |
-| **WebView2 Runtime** | Renders the app | Already on Windows 11; see the link above for Windows 10 |
+| **WebView2 Runtime** | Renders the app (Windows only) | Already on Windows 11; see the link above for Windows 10 |
+| **Xcode Command Line Tools** | Compiler and linker (macOS only, replaces the C++ Build Tools) | Run `xcode-select --install` in Terminal |
 | **Git** | Gets the source | <https://git-scm.com> |
 
 Tauri's [prerequisites guide](https://v2.tauri.app/start/prerequisites/) covers the same steps with screenshots.
@@ -64,6 +86,15 @@ npm run tauri build                    # build installers (.msi and setup .exe)
 | --- | --- |
 | `npm run tauri build -- --no-bundle` | `src-tauri/target/release/stream-player.exe` |
 | `npm run tauri build` | `src-tauri/target/release/bundle/msi/*.msi` and `src-tauri/target/release/bundle/nsis/*-setup.exe` |
+
+On a Mac, `npm run tauri build` produces `Stream Player.app` and a `.dmg` in `src-tauri/target/release/bundle/`. For one app that runs on both Apple Silicon and Intel:
+
+```sh
+rustup target add aarch64-apple-darwin x86_64-apple-darwin
+npm run tauri build -- --target universal-apple-darwin
+```
+
+Every published release gets its macOS build from [`.github/workflows/macos.yml`](.github/workflows/macos.yml), which runs this on a GitHub-hosted Mac and attaches the `.dmg` to the release.
 
 The first build downloads and compiles the Rust dependencies and takes a few minutes. Later builds take well under a minute.
 
