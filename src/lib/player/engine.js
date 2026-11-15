@@ -4,6 +4,7 @@ import JSON5 from "json5";
 import { isTauri, parseHeaders, hostOf } from "$lib";
 import { TauriFetchLoader } from "$lib/TauriFetchLoader.js";
 import { detectFormat, parseClearKeys } from "$lib/stream.js";
+import { SoftwareClearKey, hasNativeClearKey, softwareClearKeyForced } from "$lib/player/clearkey.js";
 
 export { shaka };
 
@@ -82,6 +83,7 @@ function buildDrmConfig(stream) {
  * @param {StreamFormData} stream
  * @param {{ audio?: { language: string, label: string } | null }} [options]
  *   audio: the audio the viewer picked last time, used when the stream offers it
+ * @returns {Promise<{ kind: string, decryption: "app" | "system" | null }>}
  */
 export async function loadStream(player, stream, options = {}) {
   player.resetConfiguration();
@@ -114,8 +116,24 @@ export async function loadStream(player, stream, options = {}) {
     });
   }
 
-  const drm = buildDrmConfig(stream);
+  // ClearKey streams carry their keys, so when the engine has no ClearKey module
+  // (WebKit on macOS) the app decrypts the segments itself instead of using EME.
+  const isClearKey =
+    (stream.drmScheme === "clearkey_inline" && Object.keys(parseClearKeys(stream.clearKey)).length > 0) ||
+    (stream.drmScheme === "org.w3.clearkey" && !!stream.licenseUrl.trim());
+  const inApp = isClearKey && (softwareClearKeyForced() || !(await hasNativeClearKey()));
+
+  const drm = inApp ? null : buildDrmConfig(stream);
   if (drm) player.configure({ drm });
+
+  // In-app decryption handles MP4 segments; steer Shaka away from WebM versions
+  // (VP9 / Opus in WebM encrypt differently) when a stream offers both.
+  if (inApp) {
+    player.configure({
+      preferredVideoCodecs: ["avc1", "avc3", "hvc1", "hev1", "dvh1", "dvhe", "av01"],
+      preferredAudioCodecs: ["mp4a", "ec-3", "ac-3", "flac", "opus"],
+    });
+  }
 
   if (stream.shakaConfig.trim()) {
     try {
@@ -147,8 +165,30 @@ export async function loadStream(player, stream, options = {}) {
     }
   });
 
+  net.clearAllResponseFilters();
+  if (inApp) {
+    const decryptor = new SoftwareClearKey({
+      keys: stream.drmScheme === "clearkey_inline" ? parseClearKeys(stream.clearKey) : {},
+      licenseUrl: stream.drmScheme === "org.w3.clearkey" ? stream.licenseUrl.trim() : "",
+      requestLicense: async (body) => {
+        const request = shaka.net.NetworkingEngine.makeRequest(
+          [stream.licenseUrl.trim()],
+          player.getConfiguration().drm.retryParameters
+        );
+        request.method = "POST";
+        request.body = new TextEncoder().encode(body);
+        const response = await net.request(RequestType.LICENSE, request).promise;
+        return new TextDecoder().decode(response.data);
+      },
+    });
+    const Advanced = shaka.net.NetworkingEngine.AdvancedRequestType;
+    net.registerResponseFilter((type, response, context) =>
+      decryptor.filter(type, response, context, RequestType, Advanced)
+    );
+  }
+
   await player.load(stream.streamUrl, null, mimeType ?? undefined);
-  return kind;
+  return { kind, decryption: inApp ? "app" : drm ? "system" : null };
 }
 
 /** Errors that only mean "a newer load replaced this one". */
@@ -171,6 +211,21 @@ export function describeError(error, stream) {
   const scheme = error?.data?.[0];
 
   switch (error?.code) {
+    case Code.ENCRYPTED_CONTENT_WITHOUT_DRM_INFO:
+      return {
+        title: "This stream is encrypted in a way the app can't decrypt",
+        detail:
+          "The app decrypts ClearKey itself only for MP4 segments. This stream uses another format, such as encrypted WebM, which needs ClearKey support in the system's browser engine.",
+        code,
+      };
+    case Code.RESPONSE_FILTER_ERROR:
+      return {
+        title: "Couldn't decrypt this stream",
+        detail:
+          error.data?.[0]?.message ||
+          "The ClearKey key may not match this stream. Check the kid:key value or the license server.",
+        code,
+      };
     case Code.UNSUPPORTED_SCHEME:
       return {
         title: "This address isn't an http or https link",

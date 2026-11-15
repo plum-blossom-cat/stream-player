@@ -66,6 +66,8 @@
    * @type {{ width: number, height: number, fps: number, bandwidth: number } | null}
    */
   let onScreen = $state(null);
+  /** "app" when ClearKey is decrypted in the app, "system" when the engine's DRM does it. */
+  let decryption = $state(null);
   /** @type {import("$lib/player/audio.js").AudioItem[]} */
   let audioItems = $state([]);
   const activeAudio = $derived(audioItems.find((item) => item.active) || null);
@@ -139,13 +141,15 @@
     measuredFps = 0;
     fpsSample = null;
     onScreen = null;
+    decryption = null;
     abrOn = true;
     rate = 1;
     try {
-      await loadStream(shakaPlayer, stream, {
+      const result = await loadStream(shakaPlayer, stream, {
         audio: settings.rememberAudio ? loadAudioPreference() : null,
       });
       if (session !== player.session) return;
+      decryption = result.decryption;
       isLive = shakaPlayer.isLive();
       refreshTracks();
       tick();
@@ -727,12 +731,13 @@
 
   {#if showStats}
     <dl class="stats num chrome" transition:fade={{ duration: 120 }}>
-      <dt>Resolution</dt><dd>{stats.resolution ?? "–"}</dd>
+      <dt>Resolution</dt><dd>{shownWidth && shownHeight ? `${shownWidth} × ${shownHeight}` : (stats.resolution ?? "–")}</dd>
       <dt>Frame rate</dt><dd>{declaredFps ? `${fmtFps(declaredFps)} declared` : "Not declared"}{measuredFps ? `, ${measuredFps.toFixed(1)} rendered` : ""}</dd>
-      <dt>Stream bitrate</dt><dd>{stats.bitrate ?? "–"}</dd>
+      <dt>Stream bitrate</dt><dd>{shownBandwidth ? fmtRate(shownBandwidth) : (stats.bitrate ?? "–")}</dd>
       <dt>Bandwidth estimate</dt><dd>{stats.estimate ?? "–"}</dd>
       <dt>Buffer ahead</dt><dd>{stats.buffer ?? "–"}</dd>
       <dt>Dropped frames</dt><dd>{stats.dropped ?? "–"}</dd>
+      {#if decryption}<dt>Decryption</dt><dd>{decryption === "app" ? "ClearKey, in the app" : "System DRM"}</dd>{/if}
       <dt>Codecs</dt><dd>{stats.codecs ?? "–"}</dd>
       {#if stats.latency}<dt>Live latency</dt><dd>{stats.latency}</dd>{/if}
     </dl>

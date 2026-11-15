@@ -49,7 +49,7 @@ If macOS instead says the app "is damaged and can't be opened", that's the same 
 xattr -dr com.apple.quarantine "/Applications/Stream Player.app"
 ```
 
-Encrypted streams: macOS's built-in browser engine (WebKit) has more limited DRM support than Windows. Plain HLS and DASH play normally; ClearKey and Widevine streams may not.
+Encrypted streams on macOS: the built-in browser engine (WebKit) has no ClearKey module, so the app decrypts ClearKey streams itself (see below). Widevine and PlayReady don't work on macOS.
 
 ## Build it yourself
 
@@ -118,6 +118,9 @@ In a plain browser, Referer, Origin, Cookie and User-Agent headers can't be sent
 - Channel up / down while watching a playlist (N / P, Page Up / Page Down).
 - Adaptive bitrate is on by default (the original locked streams to one quality).
 - Errors explain what went wrong and offer Try again and Edit stream.
+
+### ClearKey without a DRM module
+ClearKey streams include their keys, so when the system's browser engine has no ClearKey support (WebKit on macOS) the app decrypts the video itself. Each fragmented-MP4 segment is decrypted with WebCrypto and rewritten to look unencrypted before playback. It supports the `cenc`, `cbcs` and `cbc1` schemes, inline `kid:key` pairs and ClearKey license servers, in DASH and HLS. Encrypted WebM and MPEG-TS segments still need the engine's own ClearKey. Stream stats (I) show which path is used. See `src/lib/player/clearkey.js`.
 
 ### Fixes
 - Widevine / PlayReady certificate URLs were passed as raw bytes; they now use `serverCertificateUri`.
