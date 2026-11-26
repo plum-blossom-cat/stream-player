@@ -50,4 +50,12 @@
   .toast.error {
     border-left-color: var(--red);
   }
+
+  /* Phones: above the tab bar and link bar, near the top where nothing is docked. */
+  @media (max-width: 640px) {
+    .toasts {
+      top: 16px;
+      bottom: auto;
+    }
+  }
 </style>

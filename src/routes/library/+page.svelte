@@ -7,10 +7,31 @@
   import { openPlayer, player } from "$lib/player/player.svelte.js";
   import { workspace } from "$lib/workspace.svelte.js";
   import { showToast } from "$lib/toast.svelte.js";
+  import { viewport } from "$lib/viewport.svelte.js";
+  import Sheet from "$lib/components/mobile/Sheet.svelte";
 
   let saved = $state([]);
   let history = $state([]);
   let query = $state("");
+  // Phone: one list at a time, and a sheet of actions for the tapped row.
+  let tab = $state("profiles");
+  /** @type {{ kind: "profile" | "history", item: any } | null} */
+  let actions = $state(null);
+  const actionTitle = $derived(
+    actions ? (actions.kind === "profile" ? actions.item.name : actions.item.title || hostOf(actions.item.stream.streamUrl)) : ""
+  );
+
+  function act(fn) {
+    const item = actions?.item;
+    actions = null;
+    if (item) fn(item);
+  }
+
+  function playFromSheet() {
+    const a = actions;
+    actions = null;
+    if (a) openPlayer(a.item.stream, { title: a.kind === "profile" ? a.item.name : a.item.title });
+  }
 
   const matches = (text) => text.toLowerCase().includes(query.trim().toLowerCase());
   const filteredSaved = $derived(
@@ -25,7 +46,10 @@
     history = loadList(STORAGE_KEYS.history);
   }
 
-  onMount(refresh);
+  onMount(() => {
+    refresh();
+    if (!saved.length && history.length) tab = "history";
+  });
 
   $effect(() => {
     if (!player.open) refresh();
@@ -67,11 +91,107 @@
   }
 </script>
 
+{#if viewport.phone}
+<div class="m-screen">
+  <h1 class="m-title lib-title">Library</h1>
+
+  <div class="m-seg" role="group" aria-label="Show">
+    <button aria-pressed={tab === "profiles"} onclick={() => (tab = "profiles")}>Profiles <span class="count num">{saved.length}</span></button>
+    <button aria-pressed={tab === "history"} onclick={() => (tab = "history")}>History <span class="count num">{history.length}</span></button>
+  </div>
+
+  {#if saved.length + history.length > 4}
+    <div class="m-search">
+      <Icon name="search" size={18} />
+      <label for="libraryQueryM" class="visually-hidden">Filter library</label>
+      <input id="libraryQueryM" bind:value={query} placeholder="Search by name or link" enterkeyhint="search" />
+    </div>
+  {/if}
+
+  {#if tab === "profiles"}
+    {#if filteredSaved.length}
+      <div class="m-group list">
+        {#each filteredSaved as item (item.id)}
+          <div class="m-row">
+            <span class="m-tile" aria-hidden="true"><Icon name="bookmark" size={19} /></span>
+            <button class="row-hit" onclick={() => openPlayer(item.stream, { title: item.name })}>
+              <span class="m-row-text">
+                <span class="m-row-title">{item.name}</span>
+                <span class="m-row-meta">
+                  <span class="tag">{formatLabel(item.stream)}</span>
+                  {#if item.stream.drmScheme !== "none"}<span class="tag drm">DRM</span>{/if}
+                  <span class="m-sub">{hostOf(item.stream.streamUrl)}</span>
+                </span>
+              </span>
+            </button>
+            <button class="m-icon-btn" onclick={() => (actions = { kind: "profile", item })} aria-label="More for {item.name}">
+              <Icon name="more" size={20} />
+            </button>
+          </div>
+        {/each}
+      </div>
+    {:else if saved.length}
+      <p class="m-none">No profiles match “{query}”.</p>
+    {:else}
+      <div class="m-empty list">
+        <strong>No profiles yet</strong>
+        On Watch, open Options under the link bar and save a stream with its headers and keys.
+      </div>
+    {/if}
+  {:else}
+    {#if filteredHistory.length}
+      <div class="m-group list">
+        {#each filteredHistory as item (item.id)}
+          <div class="m-row">
+            <span class="m-tile" aria-hidden="true"><Icon name="clock" size={19} /></span>
+            <button class="row-hit" onclick={() => openPlayer(item.stream, { title: item.title })}>
+              <span class="m-row-text">
+                <span class="m-row-title">{item.title || hostOf(item.stream.streamUrl)}</span>
+                <span class="m-row-meta">
+                  <span class="tag">{formatLabel(item.stream)}</span>
+                  {#if item.stream.drmScheme !== "none"}<span class="tag drm">DRM</span>{/if}
+                  <span class="m-sub">{formatWhen(item.lastPlayed)}</span>
+                </span>
+              </span>
+            </button>
+            <button class="m-icon-btn" onclick={() => (actions = { kind: "history", item })} aria-label="More for {item.title || hostOf(item.stream.streamUrl)}">
+              <Icon name="more" size={20} />
+            </button>
+          </div>
+        {/each}
+      </div>
+      <button class="m-btn danger clear-all" onclick={clearHistory}>Clear history</button>
+    {:else if history.length}
+      <p class="m-none">Nothing in history matches “{query}”.</p>
+    {:else}
+      <div class="m-empty list">
+        <strong>Nothing played yet</strong>
+        Streams you play show up here so you can get back to them.
+      </div>
+    {/if}
+  {/if}
+</div>
+
+<Sheet open={!!actions} title={actionTitle} onclose={() => (actions = null)}>
+  {#if actions}
+    <p class="sheet-url">{actions.item.stream.streamUrl}</p>
+    <button class="m-btn primary" onclick={playFromSheet}><Icon name="play" size={18} /> Play</button>
+    {#if actions.kind === "profile"}
+      <button class="m-btn" onclick={() => act(edit)}><Icon name="edit" size={17} /> Edit</button>
+      <button class="m-btn danger" onclick={() => act(remove)}><Icon name="trash" size={17} /> Delete profile</button>
+    {:else}
+      <button class="m-btn" onclick={() => act(editHistory)}><Icon name="edit" size={17} /> Put in the link bar</button>
+      <button class="m-btn" onclick={() => act(keep)}><Icon name="bookmark" size={17} /> Save as profile</button>
+      <button class="m-btn danger" onclick={() => act(forget)}><Icon name="close" size={17} /> Remove from history</button>
+    {/if}
+  {/if}
+</Sheet>
+{:else}
 <div class="page">
   <div class="page-head">
     <div>
       <h1 class="display">Library</h1>
-      <p class="lede">Profiles you saved and everything you played recently, kept on this computer.</p>
+      <p class="lede">Profiles you saved and everything you played recently, kept on this device.</p>
     </div>
     {#if saved.length || history.length}
       <div class="search">
@@ -168,6 +288,7 @@
     {/if}
   </section>
 </div>
+{/if}
 
 <style>
   .search {
@@ -251,5 +372,82 @@
     .when {
       display: none;
     }
+  }
+
+  /* ---------- Phone ---------- */
+  .lib-title {
+    margin-top: 22px;
+  }
+
+  .count {
+    margin-left: 6px;
+    opacity: 0.6;
+    font-size: 12.5px;
+  }
+
+  .m-search {
+    position: relative;
+    margin-top: 12px;
+    color: var(--m-muted);
+  }
+
+  .m-search :global(svg) {
+    position: absolute;
+    left: 16px;
+    top: 15px;
+  }
+
+  .m-search input {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px 0 46px;
+    border-radius: 999px;
+    border: 1px solid var(--m-line);
+    background: var(--m-raised);
+    color: var(--m-ink);
+    font-size: 16px;
+    outline: none;
+  }
+
+  .m-search input:focus {
+    border-color: var(--accent);
+  }
+
+  .list {
+    margin-top: 16px;
+  }
+
+  .row-hit {
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: inherit;
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .m-none {
+    margin: 20px 4px;
+    color: var(--m-muted);
+  }
+
+  .clear-all {
+    margin-top: 20px;
+  }
+
+  .sheet-url {
+    margin: 0 0 18px;
+    color: var(--m-muted);
+    font-size: 13px;
+    word-break: break-all;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
   }
 </style>

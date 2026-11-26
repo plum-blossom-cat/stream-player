@@ -5,6 +5,40 @@
     <title>Stream Player</title>
     <link rel="icon" type="image/svg+xml" href="%sveltekit.assets%/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script>
+      // Built-ins missing from older Android WebViews (before Chrome ~98).
+      if (!String.prototype.replaceAll) {
+        String.prototype.replaceAll = function (search, replacement) {
+          if (search instanceof RegExp) return this.replace(search, replacement);
+          return this.split(String(search)).join(typeof replacement === "function" ? replacement(String(search)) : replacement);
+        };
+      }
+      for (const C of [Array, String, Int8Array, Uint8Array, Uint8ClampedArray, Int16Array, Uint16Array, Int32Array, Uint32Array, Float32Array, Float64Array]) {
+        if (!C.prototype.at) {
+          Object.defineProperty(C.prototype, "at", {
+            configurable: true,
+            writable: true,
+            value: function (i) {
+              i = Math.trunc(i) || 0;
+              if (i < 0) i += this.length;
+              return i < 0 || i >= this.length ? undefined : this[i];
+            },
+          });
+        }
+      }
+      if (!Object.hasOwn) Object.hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+      if (!window.structuredClone) window.structuredClone = (v) => (v === undefined ? v : JSON.parse(JSON.stringify(v)));
+      // Chrome 83 and older ignore `gap` in flexbox; app.css adds margins under this class.
+      (function () {
+        var box = document.createElement("div");
+        box.style.cssText = "display:flex;flex-direction:column;row-gap:1px;position:absolute";
+        box.appendChild(document.createElement("div"));
+        box.appendChild(document.createElement("div"));
+        document.documentElement.appendChild(box);
+        if (box.scrollHeight !== 1) document.documentElement.classList.add("no-flex-gap");
+        box.remove();
+      })();
+    </script>
     %sveltekit.head%
   </head>
   <body data-sveltekit-preload-data="hover">

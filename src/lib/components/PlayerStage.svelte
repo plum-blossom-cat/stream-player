@@ -8,7 +8,7 @@
   import { shaka, installShaka, loadStream, describeError, isInterruption } from "$lib/player/engine.js";
   import { describeAudioTracks, languageLabel, loadAudioPreference, saveAudioPreference } from "$lib/player/audio.js";
   import { formatLabel } from "$lib/stream.js";
-  import { hostOf } from "$lib";
+  import { hostOf, isTv, isAndroid, androidHost } from "$lib";
   import { settings } from "$lib/settings.svelte.js";
   import { workspace } from "$lib/workspace.svelte.js";
   import { showToast } from "$lib/toast.svelte.js";
@@ -79,8 +79,25 @@
 
   let tickTimer;
   let unwatchFullscreen;
+
+  // Android phones: the player opens fullscreen in landscape and can shrink into
+  // a picture-in-picture window (MainActivity does the native part).
+  const isPhoneApp = isAndroid && !isTv;
+  const androidPip = (() => {
+    try {
+      return !!androidHost?.canPip?.();
+    } catch {
+      return false;
+    }
+  })();
+  let pipMode = $state(false);
+  let videoSize = $state({ w: 16, h: 9 });
   let lastFullscreenChange = 0;
   let clickTimer;
+  /** What had focus before the player opened, so Back on a TV lands there again. */
+  const focusBefore = typeof document !== "undefined" ? document.activeElement : null;
+  /** Pointer type and whether the controls were hidden when it went down. */
+  let lastPointer = { type: "mouse", wasIdle: false };
   let notice = $state("");
   let noticeTimer;
 
@@ -428,6 +445,10 @@
   }
 
   async function togglePip() {
+    if (androidPip) {
+      androidHost.enterPip();
+      return;
+    }
     try {
       if (document.pictureInPictureElement) await document.exitPictureInPicture();
       else await video.requestPictureInPicture();
@@ -472,11 +493,18 @@
     }, 2600);
   }
 
+  function onStagePointerDown(event) {
+    lastPointer = { type: event.pointerType, wasIdle: idle };
+    wake();
+  }
+
   function onSurfaceClick() {
     if (menu) {
       menu = null;
       return;
     }
+    // On touch screens the first tap only brings the controls back.
+    if (lastPointer.type === "touch" && lastPointer.wasIdle) return;
     clearTimeout(clickTimer);
     clickTimer = setTimeout(togglePlay, 220);
   }
@@ -500,6 +528,8 @@
     const onRange = target instanceof HTMLInputElement && target.type === "range";
     const onButton = target instanceof HTMLButtonElement;
     const key = event.key;
+    // On TV, arrow keys on a focused control move between controls (see spatial.js).
+    const onControl = isTv && !!target?.closest?.(".stage button, .stage input");
 
     const handled = (() => {
       switch (key) {
@@ -509,6 +539,34 @@
           if (onButton && key === " ") return false;
           togglePlay();
           return true;
+        case "Enter":
+          // TV remotes' OK button. On a focused control it presses that control instead.
+          if (onButton || onRange) return false;
+          togglePlay();
+          return true;
+        case "MediaPlayPause":
+          togglePlay();
+          return true;
+        case "MediaPlay":
+          if (video.paused) togglePlay();
+          return true;
+        case "MediaPause":
+          if (!video.paused) togglePlay();
+          return true;
+        case "MediaFastForward":
+          seekBy(30);
+          return true;
+        case "MediaRewind":
+          seekBy(-30);
+          return true;
+        case "ChannelUp":
+        case "MediaTrackNext":
+          stepQueue(1);
+          return hasQueue;
+        case "ChannelDown":
+        case "MediaTrackPrevious":
+          stepQueue(-1);
+          return hasQueue;
         case "f":
         case "F":
         case "F11":
@@ -531,20 +589,23 @@
           cycleAudio();
           return hasAudioChoice;
         case "ArrowLeft":
-          if (onRange) return false;
+          if (onRange || onControl) return false;
           seekBy(-10);
           return true;
         case "ArrowRight":
-          if (onRange) return false;
+          if (onRange || onControl) return false;
           seekBy(10);
           return true;
         case "ArrowUp":
-          if (onRange) return false;
-          setVolume(video.volume + 0.05);
-          return true;
         case "ArrowDown":
-          if (onRange) return false;
-          setVolume(video.volume - 0.05);
+          if (onRange || onControl) return false;
+          if (isTv) {
+            // TVs set volume on the TV itself; up/down brings the controls into reach.
+            wake();
+            stageEl.querySelector(".bar .ctl")?.focus();
+            return true;
+          }
+          setVolume(video.volume + (key === "ArrowUp" ? 0.05 : -0.05));
           return true;
         case "PageUp":
         case "p":
@@ -558,6 +619,8 @@
           return hasQueue;
         case "Escape":
           if (menu) menu = null;
+          // On TV and phones the player opens fullscreen, so Back closes it.
+          else if (isAndroid) close();
           else if (player.fullscreen) toggleFullscreen();
           // A browser consumes Esc to leave fullscreen; don't treat the same press as "close".
           else if (performance.now() - lastFullscreenChange > 400) close();
@@ -581,6 +644,16 @@
     const stream = player.stream;
     if (!ready || !stream) return;
     untrack(() => load(stream, session));
+  });
+
+  // Keep the phone or TV from sleeping while something plays.
+  $effect(() => {
+    androidHost?.setKeepScreenOn(!paused && !error);
+  });
+
+  // Tell Android the play state and video shape for the PiP window.
+  $effect(() => {
+    if (androidPip) androidHost.setPipState(!paused && !error, videoSize.w, videoSize.h);
   });
 
   $effect(() => {
@@ -633,6 +706,28 @@
 
     tickTimer = setInterval(tick, 250);
     window.addEventListener("keydown", onKeydown, true);
+    // On a TV the player fills the screen straight away; phones turn to landscape.
+    if (isTv) player.fullscreen = true;
+    else if (isPhoneApp) {
+      player.fullscreen = true;
+      enterFullscreen(stageEl).catch(() => {});
+    }
+    if (androidPip) {
+      window["__streamPlayerPip"] = (on) => {
+        pipMode = on;
+        if (on) menu = null;
+      };
+      window["__streamPlayerPipToggle"] = () => togglePlay();
+      window["__streamPlayerPipResume"] = () => {
+        if (video?.paused) video.play().catch(() => {});
+      };
+    }
+    if (isAndroid) {
+      // The app went to the background without PiP, or the PiP window was closed.
+      window["__streamPlayerStopped"] = () => {
+        if (video && !video.paused) video.pause();
+      };
+    }
     ready = true;
   });
 
@@ -644,6 +739,16 @@
     if (typeof window !== "undefined") window.removeEventListener("keydown", onKeydown, true);
     unwatchFullscreen?.();
     shakaPlayer?.destroy();
+    androidHost?.setKeepScreenOn(false);
+    if (androidPip) androidHost.setPipState(false, 0, 0);
+    delete window["__streamPlayerPip"];
+    delete window["__streamPlayerPipToggle"];
+    delete window["__streamPlayerPipResume"];
+    delete window["__streamPlayerStopped"];
+    if (isTv && focusBefore instanceof HTMLElement && focusBefore !== document.body) {
+      // The page under the player is inert until the stage is gone.
+      requestAnimationFrame(() => focusBefore.focus());
+    }
     if (player.fullscreen) {
       player.fullscreen = false;
       exitFullscreen().catch(() => {});
@@ -654,10 +759,11 @@
 <div
   class="stage"
   class:fullscreen={player.fullscreen}
+  class:pip={pipMode}
   class:idle
   bind:this={stageEl}
   onpointermove={wake}
-  onpointerdown={wake}
+  onpointerdown={onStagePointerDown}
   onwheel={onWheel}
   role="region"
   aria-label="Video player"
@@ -672,6 +778,9 @@
     onpause={() => (paused = true)}
     onvolumechange={onVolumeChange}
     onratechange={() => (rate = video.playbackRate)}
+    onresize={() => {
+      if (video.videoWidth && video.videoHeight) videoSize = { w: video.videoWidth, h: video.videoHeight };
+    }}
   ></video>
 
   <!-- Click to play / pause, double-click for fullscreen -->
@@ -926,7 +1035,7 @@
         {/if}
       </div>
 
-      {#if typeof document !== "undefined" && document.pictureInPictureEnabled}
+      {#if androidPip || (!isAndroid && typeof document !== "undefined" && document.pictureInPictureEnabled)}
         <button class="ctl" onclick={togglePip} aria-label="Picture in picture" title="Picture in picture">
           <Icon name="pip" size={20} />
         </button>
@@ -1576,6 +1685,11 @@
     color: var(--c-ink);
   }
 
+  /* TVs set volume on the TV; the slider would also swallow left/right on the remote. */
+  :global(html.tv) .volume-range {
+    display: none;
+  }
+
   @media (max-width: 640px) {
     .volume-range {
       display: none;
@@ -1586,5 +1700,10 @@
     .bottom {
       padding: 40px 6px 6px;
     }
+  }
+
+  /* Picture in picture on Android: the window is tiny, so show only the video. */
+  .stage.pip > :not(video) {
+    display: none !important;
   }
 </style>

@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { page } from "$app/state";
-  import { isTauri, isMac } from "$lib";
+  import { isTauri, isMac, hasWindowChrome } from "$lib";
   import Icon from "$lib/components/Icon.svelte";
   import Logo from "$lib/components/Logo.svelte";
   import { player, closePlayer } from "$lib/player/player.svelte.js";
@@ -21,7 +21,7 @@
     href === "/" ? page.url.pathname === "/" : page.url.pathname.startsWith(href);
 
   onMount(async () => {
-    if (!isTauri) return;
+    if (!hasWindowChrome) return;
     const { getCurrentWindow } = await import("@tauri-apps/api/window");
     appWindow = getCurrentWindow();
     maximized = await appWindow.isMaximized();
@@ -59,7 +59,7 @@
     <span class="on-air" data-tauri-drag-region><i aria-hidden="true"></i>Playing</span>
   {/if}
 
-  {#if isTauri && !isMac}
+  {#if hasWindowChrome && !isMac}
     <div class="window-controls">
       <button onclick={() => appWindow?.minimize()} aria-label="Minimize" title="Minimize">
         <Icon name="win-min" size={16} />

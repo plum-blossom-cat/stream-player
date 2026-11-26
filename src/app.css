@@ -30,6 +30,7 @@
 
   --font: "Archivo Variable", "Archivo", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
   --titlebar-h: 44px;
+  --tabbar-h: 56px;
   --r-xs: 3px;
   --r-sm: 5px;
   --r-md: 6px;
@@ -145,6 +146,13 @@ a {
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
+}
+
+/* Android TV: focus is the only cursor, so make it unmissable from the sofa. */
+html.tv :focus-visible,
+html.tv :focus {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
 }
 
 ::selection {
@@ -593,6 +601,11 @@ select.input option {
   font-variation-settings: "wdth" 88;
 }
 
+/* Icon tile on list rows; shown on phones only. */
+.row-icon {
+  display: none;
+}
+
 .row-actions {
   display: flex;
   align-items: center;
@@ -605,5 +618,397 @@ select.input option {
   *::after {
     transition-duration: 0ms !important;
     animation-duration: 0ms !important;
+  }
+}
+
+
+/* Fallback spacing for old WebViews without flexbox gap (see app.html). */
+.no-flex-gap .btn > svg:not(:only-child),
+.no-flex-gap .play > svg {
+  margin-right: 8px;
+}
+
+.no-flex-gap .row-meta > * + *,
+.no-flex-gap .recent-meta > * + *,
+.no-flex-gap .row-actions > * + *,
+.no-flex-gap .meta > * + * {
+  margin-left: 8px;
+}
+
+.no-flex-gap .h-icon {
+  margin-right: 10px;
+}
+
+.no-flex-gap .save-row > * + * {
+  margin-left: 8px;
+}
+
+/* ------------------------------------------------------------------
+   Phone UI (viewport.phone): native-style screens, grouped lists,
+   a docked link bar and bottom sheets. Corner sizes carry hierarchy:
+   sheet 24, hero 20, groups 16, tiles 12, pills round.
+------------------------------------------------------------------- */
+:root {
+  --m-tabbar: 66px;
+  --m-panel: var(--surface);
+  --m-raised: var(--raised);
+  --m-line: var(--line);
+  --m-line-strong: var(--line-strong);
+  --m-ink: var(--ink);
+  --m-muted: var(--muted);
+  --m-tile: #1a1b1f;
+}
+
+/* Light theme: tiles need their own tint, since raised and surface are both white. */
+:root[data-theme="light"] {
+  --m-tile: #eceef2;
+  --m-raised: #e9ebef;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --m-tile: #eceef2;
+    --m-raised: #e9ebef;
+  }
+}
+
+.m-screen {
+  padding: 4px 16px 28px;
+}
+
+.m-appbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+}
+
+.m-appbar .m-brand {
+  font-size: 15px;
+  font-weight: 700;
+  font-variation-settings: "wdth" 122;
+}
+
+.m-appbar .m-spacer {
+  flex: 1;
+}
+
+.m-icon-btn {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--m-ink);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m-icon-btn:active {
+  background: var(--m-raised);
+}
+
+.m-title {
+  margin: 6px 0 18px;
+  font-size: 32px;
+  line-height: 1.05;
+  font-weight: 720;
+  font-variation-settings: "wdth" 125;
+  letter-spacing: -0.02em;
+}
+
+.m-h2 {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin: 26px 4px 10px;
+  font-size: 15px;
+  font-weight: 640;
+}
+
+.m-h2 a,
+.m-h2 button {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent-text);
+  text-decoration: none;
+  background: none;
+  border: 0;
+  padding: 0;
+}
+
+.m-group {
+  border-radius: 16px;
+  background: var(--m-panel);
+  border: 1px solid var(--m-line);
+  overflow: hidden;
+}
+
+.m-group + .m-group {
+  margin-top: 12px;
+}
+
+.m-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 14px;
+  min-height: 68px;
+  padding: 10px 6px 10px 12px;
+  border: 0;
+  border-top: 1px solid var(--m-line);
+  background: transparent;
+  color: var(--m-ink);
+  text-align: left;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m-row:first-child {
+  border-top: 0;
+}
+
+.m-row:active {
+  background: var(--m-raised);
+}
+
+.m-tile {
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--m-tile);
+  color: var(--accent-text);
+}
+
+.m-row-text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.m-row-title {
+  font-size: 16px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.m-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--m-muted);
+  font-size: 13px;
+}
+
+.m-row-meta .m-sub {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--m-line-strong);
+  background: var(--m-raised);
+  color: var(--m-ink);
+  font-size: 13.5px;
+  font-weight: 580;
+  white-space: nowrap;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.m-chip:active {
+  border-color: var(--accent);
+}
+
+.m-chip.on {
+  background: var(--m-ink);
+  border-color: var(--m-ink);
+  color: var(--bg);
+}
+
+.m-badge {
+  min-width: 20px;
+  height: 20px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 11.5px;
+  font-weight: 720;
+  font-variant-numeric: tabular-nums;
+}
+
+.m-seg {
+  display: flex;
+  padding: 4px;
+  gap: 4px;
+  border-radius: 999px;
+  background: var(--m-raised);
+}
+
+.m-seg button {
+  flex: 1;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--m-muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.m-seg button[aria-pressed="true"] {
+  background: var(--m-ink);
+  color: var(--bg);
+}
+
+.m-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.m-field > label {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--m-muted);
+}
+
+.m-input {
+  width: 100%;
+  min-height: 52px;
+  padding: 0 16px;
+  border-radius: 14px;
+  border: 1px solid var(--m-line);
+  background: var(--m-raised);
+  color: var(--m-ink);
+  font-size: 16px;
+}
+
+textarea.m-input {
+  padding: 14px 16px;
+  min-height: 96px;
+  resize: vertical;
+}
+
+select.m-input {
+  appearance: none;
+}
+
+.m-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.m-btn {
+  width: 100%;
+  min-height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 14px;
+  border: 1px solid var(--m-line-strong);
+  background: var(--m-raised);
+  color: var(--m-ink);
+  font-size: 16px;
+  font-weight: 640;
+  text-decoration: none;
+}
+
+.m-btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 720;
+}
+
+.m-btn.danger {
+  color: var(--red-text);
+}
+
+.m-btn:active {
+  transform: scale(0.985);
+}
+
+.m-btn + .m-btn {
+  margin-top: 10px;
+}
+
+.m-empty {
+  padding: 28px 20px;
+  border-radius: 16px;
+  border: 1px dashed var(--m-line-strong);
+  color: var(--m-muted);
+  text-align: center;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+
+.m-empty strong {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--m-ink);
+  font-size: 16px;
+}
+
+.m-sheet-section + .m-sheet-section {
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid var(--m-line);
+}
+
+.m-sheet-section > h3 {
+  margin-bottom: 12px;
+  font-size: 15px;
+  font-weight: 680;
+}
+
+.no-flex-gap .m-row-meta > * + * {
+  margin-left: 8px;
+}
+
+.no-flex-gap .m-chip > svg,
+.no-flex-gap .m-btn > svg {
+  margin-right: 8px;
+}
+
+.no-flex-gap .m-chip > .m-badge {
+  margin-left: 6px;
+}
+
+.no-flex-gap .m-row-text > * + * {
+  margin-top: 3px;
+}
+
+/* Touch taps shouldn't leave a focus box; keyboards still get the ring. */
+.m-screen :focus:not(:focus-visible),
+.dock :focus:not(:focus-visible),
+.m-sheet-root :focus:not(:focus-visible) {
+  outline: none;
+}
+
+@supports not selector(:focus-visible) {
+  .m-screen :focus,
+  .dock :focus,
+  .m-sheet-root :focus {
+    outline: none;
   }
 }

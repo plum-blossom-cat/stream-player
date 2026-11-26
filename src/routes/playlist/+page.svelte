@@ -6,6 +6,8 @@
   import { STORAGE_KEYS, loadList, saveList } from "$lib/stream.js";
   import { parseM3U } from "$lib/m3uParser.js";
   import { showToast } from "$lib/toast.svelte.js";
+  import { viewport } from "$lib/viewport.svelte.js";
+  import Sheet from "$lib/components/mobile/Sheet.svelte";
 
   let playlists = $state([]);
   let name = $state("");
@@ -13,7 +15,10 @@
   let urlError = $state("");
   let dragging = $state(false);
   let reading = $state(false);
-  let fileInput;
+  let fileInput = $state();
+  // Phone: adding happens in a sheet; each row has a sheet of actions.
+  let addOpen = $state(false);
+  let actionsFor = $state(null);
 
   onMount(() => (playlists = loadList(STORAGE_KEYS.playlists)));
 
@@ -36,6 +41,7 @@
     saveList(STORAGE_KEYS.playlists, playlists);
     name = "";
     url = "";
+    addOpen = false;
     goto(`/playlist/${item.id}`);
   }
 
@@ -91,6 +97,73 @@
   ondrop={onDrop}
 />
 
+{#if viewport.phone}
+<div class="m-screen">
+  <div class="m-appbar top">
+    <span class="m-spacer"></span>
+    <button class="m-icon-btn" onclick={() => fileInput.click()} disabled={reading} aria-label="Open a playlist file">
+      <Icon name="file" size={21} />
+    </button>
+  </div>
+  <h1 class="m-title">Playlists</h1>
+
+  {#if playlists.length}
+    <div class="m-group">
+      {#each playlists as item (item.id)}
+        <div class="m-row">
+          <span class="m-tile" aria-hidden="true"><Icon name="list" size={20} /></span>
+          <a class="row-hit" href={`/playlist/${item.id}`}>
+            <span class="m-row-text">
+              <span class="m-row-title">{item.name}</span>
+              <span class="m-row-meta"><span class="m-sub">{hostOf(item.url)}</span></span>
+            </span>
+          </a>
+          <button class="m-icon-btn" onclick={() => (actionsFor = item)} aria-label="More for {item.name}">
+            <Icon name="more" size={20} />
+          </button>
+        </div>
+      {/each}
+    </div>
+  {:else}
+    <div class="m-empty">
+      <strong>No playlists yet</strong>
+      Add an M3U link or open a file from this phone. Headers and ClearKey details in the playlist apply to every channel.
+    </div>
+  {/if}
+
+  <button class="m-btn primary add-btn" onclick={() => (addOpen = true)}>
+    <Icon name="plus" size={18} /> Add playlist
+  </button>
+  <button class="m-btn" onclick={() => fileInput.click()} disabled={reading}>
+    <Icon name="file" size={17} /> {reading ? "Reading…" : "Open a file"}
+  </button>
+</div>
+
+<Sheet open={addOpen} title="Add playlist" onclose={() => (addOpen = false)}>
+  <form onsubmit={add} novalidate>
+    <div class="m-field">
+      <label for="playlistUrl">Playlist link</label>
+      <input id="playlistUrl" class="m-input" class:invalid={!!urlError} bind:value={url} placeholder="https://example.com/channels.m3u" inputmode="url" spellcheck="false" oninput={() => (urlError = "")} />
+      {#if urlError}<p class="error-text">{urlError}</p>{/if}
+    </div>
+    <div class="m-field">
+      <label for="playlistName">Name (optional)</label>
+      <input id="playlistName" class="m-input" bind:value={name} placeholder="Uses the site name if empty" enterkeyhint="done" />
+    </div>
+    <button class="m-btn primary" type="submit"><Icon name="plus" size={18} /> Add playlist</button>
+  </form>
+</Sheet>
+
+<Sheet open={!!actionsFor} title={actionsFor?.name ?? ""} onclose={() => (actionsFor = null)}>
+  {#if actionsFor}
+    <p class="sheet-url">{actionsFor.url}</p>
+    <a class="m-btn primary" href={`/playlist/${actionsFor.id}`} onclick={() => (actionsFor = null)}><Icon name="list" size={18} /> Open channels</a>
+    <button class="m-btn danger" onclick={() => { const it = actionsFor; actionsFor = null; remove(it); }}><Icon name="trash" size={17} /> Remove playlist</button>
+  {/if}
+</Sheet>
+
+<input bind:this={fileInput} type="file" accept=".m3u,.m3u8,.txt,audio/x-mpegurl,application/vnd.apple.mpegurl" hidden onchange={(e) => { openFile(e.currentTarget.files?.[0]); e.currentTarget.value = ""; }} />
+{:else}
 <div class="page">
   <div class="page-head">
     <div>
@@ -150,6 +223,7 @@
       Drop the playlist file to open it
     </div>
   </div>
+{/if}
 {/if}
 
 <style>
@@ -242,5 +316,39 @@
     .when {
       display: none;
     }
+  }
+
+  /* ---------- Phone ---------- */
+  .m-appbar.top {
+    height: 48px;
+  }
+
+  .m-appbar.top + .m-title {
+    margin-top: 0;
+  }
+
+  .row-hit {
+    min-width: 0;
+    align-self: stretch;
+    display: flex;
+    align-items: center;
+    color: inherit;
+    text-decoration: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .add-btn {
+    margin-top: 20px;
+  }
+
+  .m-input.invalid {
+    border-color: var(--red);
+  }
+
+  .sheet-url {
+    margin: 0 0 18px;
+    color: var(--m-muted);
+    font-size: 13px;
+    word-break: break-all;
   }
 </style>

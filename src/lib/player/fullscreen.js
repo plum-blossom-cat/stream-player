@@ -1,4 +1,4 @@
-import { isTauri } from "$lib";
+import { isTauri, isAndroid, androidHost } from "$lib";
 
 /*
  * Fullscreen has to work differently in the desktop app and in a browser.
@@ -10,8 +10,10 @@ import { isTauri } from "$lib";
  * transformed <dialog> with rounded corners.
  *
  * Now the desktop app fullscreens the *window* and the player stage
- * covers it with CSS (position: fixed; inset: 0). Only the browser build uses
- * the element Fullscreen API.
+ * covers it with CSS (position: fixed; inset: 0). Android has no window to
+ * resize: the stage covers the screen and MainActivity hides the system bars
+ * and turns the phone to landscape. Only the browser build uses the element
+ * Fullscreen API.
  */
 
 let appWindow = null;
@@ -26,6 +28,11 @@ async function getWindow() {
 
 /** @param {HTMLElement} element */
 export async function enterFullscreen(element) {
+  if (isAndroid) {
+    androidHost?.setFullscreen(true);
+    return;
+  }
+
   if (isTauri) {
     const win = await getWindow();
     // A shadow on an undecorated window draws a 1px frame around a fullscreen window on Windows.
@@ -41,6 +48,11 @@ export async function enterFullscreen(element) {
 }
 
 export async function exitFullscreen() {
+  if (isAndroid) {
+    androidHost?.setFullscreen(false);
+    return;
+  }
+
   if (isTauri) {
     const win = await getWindow();
     await win.setFullscreen(false);
@@ -60,6 +72,9 @@ export async function exitFullscreen() {
  * @returns {Promise<() => void>} unsubscribe
  */
 export async function watchFullscreen(onChange) {
+  // On Android only the app itself changes fullscreen.
+  if (isAndroid) return () => {};
+
   if (isTauri) {
     const win = await getWindow();
     return await win.onResized(async () => {

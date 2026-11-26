@@ -2,8 +2,11 @@
   import "@fontsource-variable/archivo/wdth.css";
   import "../app.css";
   import { onMount } from "svelte";
-  import { isTauri } from "$lib";
+  import { isTauri, isAndroid, isTv } from "$lib";
+  import { enableSpatialNavigation } from "$lib/spatial.js";
   import TitleBar from "$lib/components/TitleBar.svelte";
+  import TabBar from "$lib/components/mobile/TabBar.svelte";
+  import { viewport, closeTopSheet } from "$lib/viewport.svelte.js";
   import Toasts from "$lib/components/Toasts.svelte";
   import PlayerStage from "$lib/components/PlayerStage.svelte";
   import { player } from "$lib/player/player.svelte.js";
@@ -21,6 +24,25 @@
           event.preventDefault();
         }
       });
+    }
+
+    if (isAndroid) {
+      document.documentElement.classList.add("android");
+      if (isTv) enableSpatialNavigation();
+      // MainActivity asks this first when Back is pressed; false lets Android go back or exit.
+      window["__streamPlayerBack"] = () => {
+        if (closeTopSheet()) return true;
+        if (player.open) {
+          window.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape" }));
+          return true;
+        }
+        if (location.pathname !== "/") {
+          history.back();
+          return true;
+        }
+        return false;
+      };
+      return;
     }
 
     if (!isTauri) return;
@@ -51,9 +73,19 @@
   });
 </script>
 
-<TitleBar />
+{#if viewport.phone}
+  {#if !player.open && !viewport.typing}<TabBar />{/if}
+{:else}
+  <TitleBar />
+{/if}
 
-<main class="content" class:behind-player={player.open} inert={player.open}>
+<main
+  class="content"
+  class:phone={viewport.phone}
+  class:typing={viewport.typing}
+  class:behind-player={player.open}
+  inert={player.open}
+>
   {@render children()}
 </main>
 
@@ -73,5 +105,15 @@
 
   .behind-player {
     visibility: hidden;
+  }
+
+  /* Phones: no title bar; the tab bar sits at the bottom (hidden while typing). */
+  .content.phone {
+    top: 0;
+    bottom: var(--m-tabbar);
+  }
+
+  .content.phone.typing {
+    bottom: 0;
   }
 </style>

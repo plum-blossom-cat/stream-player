@@ -4,7 +4,7 @@
 
 # Stream Player
 
-A desktop player for Windows and macOS for HLS, DASH and IPTV playlists, with custom request headers and ClearKey / Widevine / PlayReady configuration. Built with Tauri 2, SvelteKit (Svelte 5) and Shaka Player.
+A player for Windows, macOS, Android phones and Android TV for HLS, DASH and IPTV playlists, with custom request headers and ClearKey / Widevine / PlayReady configuration. Built with Tauri 2, SvelteKit (Svelte 5) and Shaka Player.
 
 > **Credits.** This is a rebuild of [**sirat-o/stream_player**](https://github.com/sirat-o/stream_player) by Sirat, which is itself a modified version of [**MirazMac/Media-Stream-Player**](https://github.com/MirazMac/Media-Stream-Player). The stream, header, DRM and M3U handling build on their work. This version adds a new interface, a rewritten player and the fixes listed below. Released under the original MIT license; see [LICENSE](LICENSE).
 
@@ -24,7 +24,7 @@ A desktop player for Windows and macOS for HLS, DASH and IPTV playlists, with cu
 
 ## Download
 
-Both downloads are on the [latest release](../../releases/latest) page.
+All downloads are on the [latest release](../../releases/latest) page.
 
 ### Windows
 
@@ -51,6 +51,19 @@ xattr -dr com.apple.quarantine "/Applications/Stream Player.app"
 
 Encrypted streams on macOS: the built-in browser engine (WebKit) has no ClearKey module, so the app decrypts ClearKey streams itself (see below). Widevine and PlayReady don't work on macOS.
 
+### Android phones and Android TV
+
+Get `stream-player-<version>-android.apk`. The same app runs on phones, tablets and Android TV (Android 7 or newer, 64-bit and 32-bit ARM, and x86_64). For a phone you can take the smaller `stream-player-<version>-android-arm64.apk` instead; it fits almost every phone from the last several years.
+
+- **Phone or tablet:** open the APK on the device and allow installing from that source when Android asks.
+- **Android TV:** copy the APK to a USB stick and open it with a file manager, or sideload it from a computer with `adb install stream-player-<version>-android.apk`. It appears in the TV launcher with its own banner.
+
+On phones the app has its own touch layout: a link bar docked at the bottom, a tab bar, and sheets for stream options. Streams open fullscreen in landscape; Back closes the player. Press Home while a stream plays, or tap the picture-in-picture button, to keep watching in a floating window (Android 8 or newer).
+
+On TV, use the remote: the D-pad moves between buttons, **OK** selects (on a text field it opens the keyboard), **Back** closes the player or goes back. In the player, OK pauses, left and right seek, down brings up the controls, and the remote's play/pause, fast-forward, rewind and channel up/down keys work too.
+
+The app uses Android's system WebView. On old devices whose WebView is no longer updated, playback still works but a few layout details may look slightly off.
+
 ## Build it yourself
 
 ### 1. Install the tools (once)
@@ -62,6 +75,7 @@ Encrypted streams on macOS: the built-in browser engine (WebKit) has no ClearKey
 | **Microsoft C++ Build Tools** | Rust needs the MSVC linker on Windows | [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), choose the **Desktop development with C++** workload |
 | **WebView2 Runtime** | Renders the app (Windows only) | Already on Windows 11; see the link above for Windows 10 |
 | **Xcode Command Line Tools** | Compiler and linker (macOS only, replaces the C++ Build Tools) | Run `xcode-select --install` in Terminal |
+| **Android Studio** | Android SDK, NDK and a JDK (Android builds only) | <https://developer.android.com/studio>; in SDK Manager add **NDK (Side by side)** |
 | **Git** | Gets the source | <https://git-scm.com> |
 
 Tauri's [prerequisites guide](https://v2.tauri.app/start/prerequisites/) covers the same steps with screenshots.
@@ -98,6 +112,26 @@ Every published release gets its macOS build from [`.github/workflows/macos.yml`
 
 The first build downloads and compiles the Rust dependencies and takes a few minutes. Later builds take well under a minute.
 
+#### Android
+
+The Android project lives in `src-tauri/gen/android`. Point the build at Android Studio's tools first (Windows paths shown; adjust the NDK version to the one you installed):
+
+```powershell
+$env:JAVA_HOME    = "C:\Program Files\Android\Android Studio\jbr"
+$env:ANDROID_HOME = "$env:LOCALAPPDATA\Android\Sdk"
+$env:NDK_HOME     = "$env:ANDROID_HOME
+dk.3.13750724"
+rustup target add aarch64-linux-android armv7-linux-androideabi x86_64-linux-android
+```
+
+```sh
+npm run tauri android dev                                         # run on a connected device or emulator
+npm run tauri android build -- --apk                              # release APK for all CPU types
+npm run tauri android build -- --apk --target aarch64 armv7 x86_64 # the same set the releases use
+```
+
+The APK lands in `src-tauri/gen/android/app/build/outputs/apk/universal/release/`. To sign release builds, create a keystore and add `src-tauri/gen/android/keystore.properties` (ignored by git) with `storeFile`, `storePassword`, `keyAlias` and `keyPassword`; without it the release APK is unsigned and Android won't install it. Debug builds (`--debug`) are always signed with Android's debug key.
+
 ### Other useful commands
 
 ```sh
@@ -106,7 +140,7 @@ npm run check                  # type-check the Svelte code
 npx tauri icon app-icon.svg    # regenerate every app icon after editing app-icon.svg
 ```
 
-In a plain browser, Referer, Origin, Cookie and User-Agent headers can't be sent and servers must allow CORS. The desktop app routes requests through Rust, so neither limit applies there.
+In a plain browser, Referer, Origin, Cookie and User-Agent headers can't be sent and servers must allow CORS. The desktop and Android apps route requests through Rust, so neither limit applies there.
 
 ## What's new in this version
 

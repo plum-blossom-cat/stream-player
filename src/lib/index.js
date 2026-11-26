@@ -4,6 +4,26 @@ export const isTauri =
 /** macOS draws its own traffic-light window buttons (see tauri.macos.conf.json). */
 export const isMac = typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
 
+export const isAndroid = typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent);
+
+/**
+ * Bridge added by MainActivity.kt on Android (fullscreen, keep screen on, TV detection).
+ * @type {{ isTv(): boolean, setFullscreen(on: boolean): void, setKeepScreenOn(on: boolean): void } | undefined}
+ */
+export const androidHost = typeof window !== "undefined" ? window["StreamPlayerHost"] : undefined;
+
+/** Android TV: no touch, a D-pad remote and a lean-back screen. */
+export const isTv = (() => {
+  try {
+    return !!androidHost?.isTv();
+  } catch {
+    return false;
+  }
+})();
+
+/** Desktop builds have window chrome; Android has none. */
+export const hasWindowChrome = isTauri && !isAndroid;
+
 /**
  * Parse "Name: value" lines into an object with lowercase keys.
  * @param {string} input

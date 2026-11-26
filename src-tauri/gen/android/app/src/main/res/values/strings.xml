@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Stream Player</string>
+    <string name="main_activity_title">Stream Player</string>
+    <string name="pip_play">Play</string>
+    <string name="pip_pause">Pause</string>
+</resources>

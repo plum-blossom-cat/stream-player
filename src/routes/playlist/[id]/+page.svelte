@@ -8,6 +8,7 @@
   import { parseM3U } from "$lib/m3uParser.js";
   import { openPlayer, player } from "$lib/player/player.svelte.js";
   import { showToast } from "$lib/toast.svelte.js";
+  import { viewport } from "$lib/viewport.svelte.js";
 
   const PAGE_SIZE = 240;
 
@@ -136,6 +137,81 @@
   }
 </script>
 
+{#if viewport.phone}
+<div class="m-screen ch">
+  <header class="m-appbar">
+    <a class="m-icon-btn back-btn" href="/playlist" aria-label="Back to playlists"><Icon name="arrow-left" size={22} /></a>
+    <span class="m-spacer"></span>
+    {#if playlist?.url}
+      <button class="m-icon-btn" onclick={reload} disabled={loading} aria-label="Reload playlist">
+        <Icon name="refresh" size={20} />
+      </button>
+    {/if}
+  </header>
+
+  <h1 class="m-title ch-title">{playlist?.name ?? "Playlist"}</h1>
+  <p class="ch-sub">
+    {#if loading}
+      Loading channels…
+    {:else if channels.length}
+      <span class="num">{channels.length.toLocaleString()}</span> channels{playlist?.url ? ` from ${hostOf(playlist.url)}` : " from a file"}
+    {/if}
+  </p>
+
+  {#if loadError}
+    <div class="m-empty">
+      <strong>{loadError}</strong>
+      Open the link in a browser to check it, then tap reload.
+    </div>
+  {/if}
+
+  {#if channels.length}
+    <div class="ch-filters">
+      <div class="ch-search">
+        <Icon name="search" size={18} />
+        <label for="channelQueryM" class="visually-hidden">Search channels</label>
+        <input id="channelQueryM" bind:value={query} placeholder="Search {channels.length.toLocaleString()} channels" enterkeyhint="search" />
+      </div>
+      {#if groups.length > 1}
+        <div class="ch-chips" role="group" aria-label="Filter by group">
+          <button class="m-chip" class:on={group === "All"} aria-pressed={group === "All"} onclick={() => (group = "All")}>All</button>
+          {#each groups as [name, count] (name)}
+            <button class="m-chip" class:on={group === name} aria-pressed={group === name} onclick={() => (group = name)}>
+              {name} <span class="chip-n num">{count}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
+
+    {#if filtered.length}
+      <ul class="ch-grid">
+        {#each visible as channel (channel.id)}
+          <li>
+            <button class="ch-tile" class:current={player.open && player.title === channel.name} onclick={() => play(channel)}>
+              <span class="ch-logo">
+                {#if channel.logo}
+                  <img src={channel.logo} alt="" loading="lazy" decoding="async" onerror={(e) => e.currentTarget.remove()} />
+                {/if}
+                <span class="ch-initials" aria-hidden="true">{initials(channel.name)}</span>
+                <span class="ch-num num">{channel.number}</span>
+                {#if channel.stream.drmScheme !== "none"}<span class="ch-drm">DRM</span>{/if}
+              </span>
+              <span class="ch-name">{channel.name}</span>
+              {#if channel.group}<span class="ch-group">{channel.group}</span>{/if}
+            </button>
+          </li>
+        {/each}
+      </ul>
+      {#if limit < filtered.length}
+        <div bind:this={sentinel} class="more">Showing {visible.length} of {filtered.length}</div>
+      {/if}
+    {:else}
+      <p class="ch-none">No channels match “{query}”{group !== "All" ? ` in ${group}` : ""}.</p>
+    {/if}
+  {/if}
+</div>
+{:else}
 <div class="page wide">
   <a class="back" href="/playlist"><Icon name="arrow-left" size={16} />Playlists</a>
 
@@ -221,6 +297,7 @@
     {/if}
   {/if}
 </div>
+{/if}
 
 <style>
   .wide {
@@ -454,5 +531,197 @@
   .none {
     padding: 24px 0;
     color: var(--muted);
+  }
+
+  /* ---------- Phone ---------- */
+  .back-btn {
+    margin-left: -10px;
+    text-decoration: none;
+  }
+
+  .ch-title {
+    margin-bottom: 4px;
+    overflow-wrap: anywhere;
+  }
+
+  .ch-sub {
+    margin: 0 0 14px;
+    color: var(--m-muted);
+    font-size: 14px;
+  }
+
+  .ch-filters {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    margin: 0 -16px 14px;
+    padding: 8px 16px 10px;
+    background: var(--bg);
+  }
+
+  .ch-search {
+    position: relative;
+    color: var(--m-muted);
+  }
+
+  .ch-search :global(svg) {
+    position: absolute;
+    left: 16px;
+    top: 15px;
+  }
+
+  .ch-search input {
+    width: 100%;
+    height: 48px;
+    padding: 0 16px 0 46px;
+    border-radius: 999px;
+    border: 1px solid var(--m-line);
+    background: var(--m-raised);
+    color: var(--m-ink);
+    font-size: 16px;
+    outline: none;
+  }
+
+  .ch-search input:focus {
+    border-color: var(--accent);
+  }
+
+  .ch-chips {
+    display: flex;
+    gap: 8px;
+    margin: 10px -16px 0;
+    padding: 0 16px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+
+  .ch-chips::-webkit-scrollbar {
+    display: none;
+  }
+
+  :global(.no-flex-gap) .chip-n {
+    margin-left: 6px;
+  }
+
+  :global(.no-flex-gap) .ch-chips > * + * {
+    margin-left: 8px;
+  }
+
+  .chip-n {
+    margin-left: 2px;
+    opacity: 0.55;
+    font-size: 12px;
+  }
+
+  .ch-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 12px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .ch-tile {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    padding: 0;
+    border: 0;
+    background: none;
+    color: var(--m-ink);
+    text-align: left;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .ch-logo {
+    position: relative;
+    display: grid;
+    place-items: center;
+    width: 100%;
+    /* 16:10 in two columns; explicit because older WebViews lack aspect-ratio. */
+    height: calc((100vw - 44px) / 2 * 0.625);
+    margin-bottom: 8px;
+    border-radius: 16px;
+    border: 1px solid var(--m-line);
+    background: var(--m-panel);
+    overflow: hidden;
+  }
+
+  .ch-tile:active .ch-logo {
+    border-color: var(--accent);
+  }
+
+  .ch-tile.current .ch-logo {
+    border-color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--accent);
+  }
+
+  .ch-logo img {
+    position: relative;
+    z-index: 1;
+    max-width: 70%;
+    max-height: 62%;
+    object-fit: contain;
+  }
+
+  .ch-initials {
+    position: absolute;
+    font-size: 26px;
+    font-weight: 720;
+    font-variation-settings: "wdth" 120;
+    color: var(--m-muted);
+  }
+
+  .ch-num {
+    position: absolute;
+    z-index: 2;
+    left: 8px;
+    top: 8px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgb(0 0 0 / 0.55);
+    color: #f2f2f3;
+    font-size: 11px;
+    font-weight: 640;
+  }
+
+  .ch-drm {
+    position: absolute;
+    z-index: 2;
+    right: 8px;
+    top: 8px;
+    padding: 1px 6px;
+    border-radius: 6px;
+    background: rgb(255 210 63 / 0.18);
+    color: var(--accent-text);
+    font-size: 10.5px;
+    font-weight: 720;
+  }
+
+  .ch-name {
+    padding: 0 2px;
+    font-size: 14.5px;
+    font-weight: 620;
+    line-height: 1.25;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .ch-group {
+    margin-top: 2px;
+    padding: 0 2px;
+    color: var(--m-muted);
+    font-size: 12.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .ch-none {
+    color: var(--m-muted);
   }
 </style>

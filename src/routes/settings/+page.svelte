@@ -3,6 +3,22 @@
   import { STORAGE_KEYS, saveList } from "$lib/stream.js";
   import { showToast } from "$lib/toast.svelte.js";
   import { clearAudioPreference } from "$lib/player/audio.js";
+  import { isAndroid } from "$lib";
+  import Icon from "$lib/components/Icon.svelte";
+  import { viewport } from "$lib/viewport.svelte.js";
+
+  // Phone toggle rows: icon, label, note and setting key.
+  const toggles = [
+    { key: "playMuted", icon: "audio", label: "Start muted", note: "Streams begin without sound. Tap the speaker to unmute." },
+    { key: "rememberVolume", icon: "stats", label: "Remember volume", note: "Use the last volume for the next stream." },
+    { key: "rememberAudio", icon: "globe", label: "Remember audio language", note: "Start with the audio track you picked last." },
+    { key: "autoHideControls", icon: "fullscreen", label: "Hide controls while watching", note: "Controls fade out after a few seconds." },
+  ];
+
+  function setToggle(key, on) {
+    updateSettings({ [key]: on });
+    if (key === "rememberAudio" && !on) clearAudioPreference();
+  }
 
   const themes = [
     { value: "system", label: "Match system" },
@@ -30,11 +46,62 @@
   }
 </script>
 
+{#if viewport.phone}
+<div class="m-screen">
+  <h1 class="m-title set-title">Settings</h1>
+
+  <h2 class="m-h2">Appearance</h2>
+  <div class="m-group">
+    <div class="m-row theme-row">
+      <span class="m-tile" aria-hidden="true"><Icon name="moon" size={20} /></span>
+      <span class="m-row-text">
+        <span class="m-row-title">Theme</span>
+        <span class="m-row-meta"><span class="m-sub">The player always stays dark.</span></span>
+      </span>
+      <div class="m-seg theme-seg" role="group" aria-label="Theme">
+        {#each themes as theme}
+          <button aria-pressed={settings.theme === theme.value} onclick={() => updateSettings({ theme: theme.value })}>
+            {theme.value === "system" ? "Auto" : theme.label}
+          </button>
+        {/each}
+      </div>
+    </div>
+  </div>
+
+  <h2 class="m-h2">Playback</h2>
+  <div class="m-group">
+    {#each toggles as t (t.key)}
+      <label class="m-row">
+        <span class="m-tile" aria-hidden="true"><Icon name={t.icon} size={20} /></span>
+        <span class="m-row-text">
+          <span class="m-row-title wrap">{t.label}</span>
+          <span class="m-row-meta"><span class="note-m">{t.note}</span></span>
+        </span>
+        <input type="checkbox" class="switch" checked={settings[t.key]} onchange={(e) => setToggle(t.key, e.currentTarget.checked)} />
+      </label>
+    {/each}
+  </div>
+
+  <h2 class="m-h2">Data</h2>
+  <div class="m-group">
+    <button class="m-row" onclick={clearHistory}>
+      <span class="m-tile danger" aria-hidden="true"><Icon name="trash" size={19} /></span>
+      <span class="m-row-text">
+        <span class="m-row-title danger-text">Clear history</span>
+        <span class="m-row-meta"><span class="note-m">Profiles and playlists stay.</span></span>
+      </span>
+      <span></span>
+    </button>
+  </div>
+
+  <p class="foot">Settings are stored on this phone.</p>
+</div>
+{:else}
 <div class="page narrow">
   <div class="page-head">
     <div>
       <h1 class="display">Settings</h1>
-      <p class="lede">Changes apply right away and are stored on this computer.</p>
+      <p class="lede">Changes apply right away and are stored on this device.</p>
     </div>
   </div>
 
@@ -61,7 +128,7 @@
     <label class="setting">
       <div>
         <p class="label">Start muted</p>
-        <p class="note">Streams begin without sound. Press M to unmute.</p>
+        <p class="note">Streams begin without sound. {isAndroid ? 'Tap the speaker' : 'Press M'} to unmute.</p>
       </div>
       <input type="checkbox" class="switch" checked={settings.playMuted} onchange={(e) => updateSettings({ playMuted: e.currentTarget.checked })} />
     </label>
@@ -99,7 +166,8 @@
     </label>
   </section>
 
-  <section class="block" aria-labelledby="keys">
+  <!-- Remotes and touch screens have their own controls; the list is for keyboards. -->
+  <section class="block" class:hidden={isAndroid} aria-labelledby="keys">
     <h2 id="keys" class="section-title">Keyboard shortcuts in the player</h2>
     <dl class="keys">
       {#each shortcuts as [key, action]}
@@ -120,6 +188,7 @@
     </div>
   </section>
 </div>
+{/if}
 
 <style>
   .narrow {
@@ -226,5 +295,52 @@
     border-bottom-width: 2px;
     background: var(--surface);
     white-space: nowrap;
+  }
+
+  .hidden {
+    display: none;
+  }
+
+  /* ---------- Phone ---------- */
+  .set-title {
+    margin-top: 22px;
+  }
+
+  .theme-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+    row-gap: 14px;
+    padding-bottom: 14px;
+  }
+
+  .theme-seg {
+    grid-column: 1 / -1;
+  }
+
+  .m-row-title.wrap {
+    white-space: normal;
+  }
+
+  .note-m {
+    line-height: 1.35;
+  }
+
+  label.m-row {
+    cursor: pointer;
+    padding-right: 16px;
+  }
+
+  .m-tile.danger {
+    background: rgb(239 75 75 / 0.16);
+    color: var(--red-text);
+  }
+
+  .danger-text {
+    color: var(--red-text);
+  }
+
+  .foot {
+    margin: 22px 4px 0;
+    color: var(--m-muted);
+    font-size: 13px;
   }
 </style>
